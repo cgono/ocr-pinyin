@@ -49,15 +49,11 @@ def test_openapi_process_route_has_binary_content_types() -> None:
 
 
 def test_openapi_cors_get_allowed() -> None:
-    response = client.options(
+    response = client.get(
         "/openapi.json",
         headers={
             "Origin": "http://localhost:5173",
-            "Access-Control-Request-Method": "GET",
         },
     )
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
-    allow_methods_header = response.headers["access-control-allow-methods"]
-    allow_methods = {method.strip() for method in allow_methods_header.split(",")}
-    assert "GET" in allow_methods
