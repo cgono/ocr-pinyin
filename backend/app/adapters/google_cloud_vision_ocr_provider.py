@@ -96,7 +96,8 @@ class GoogleCloudVisionOcrProvider:
             creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
             if creds_json:
                 normalized_creds_json = creds_json.strip()
-                if normalized_creds_json[:1] == normalized_creds_json[-1:] and normalized_creds_json[:1] in {"'", '"'}:
+                first, last = normalized_creds_json[:1], normalized_creds_json[-1:]
+                if first == last and first in {"'", '"'}:
                     normalized_creds_json = normalized_creds_json[1:-1]
                 info = json.loads(normalized_creds_json)
                 credentials = service_account.Credentials.from_service_account_info(
