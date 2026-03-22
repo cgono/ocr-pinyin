@@ -1,5 +1,5 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
     "chat.tools.terminal.autoApprove": {
         ".venv_local/bin/python": true,
         "uv": true,

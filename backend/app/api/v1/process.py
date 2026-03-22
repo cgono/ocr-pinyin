@@ -90,7 +90,20 @@ def _build_validation_error_response(
     )
 
 
-@router.post('/process', response_model=ProcessResponse, response_model_exclude_none=True)
+@router.post('/process',
+    response_model=ProcessResponse,
+    response_model_exclude_none=True,
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "image/jpeg": {"schema": {"type": "string", "format": "binary"}},
+                "image/png": {"schema": {"type": "string", "format": "binary"}},
+                "image/webp": {"schema": {"type": "string", "format": "binary"}},
+            },
+        }
+    },
+)
 async def process_image(
     request: Request,
 ) -> ProcessResponse:

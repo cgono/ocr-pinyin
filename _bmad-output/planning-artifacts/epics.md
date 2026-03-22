@@ -262,6 +262,34 @@ So that I can continue reading immediately.
 **Then** completion state is clearly indicated
 **And** response shape remains versioned under /v1 with no auth required for MVP.
 
+### Story 1.6: Expose OpenAPI Spec and Add Bruno Developer Collection
+
+As Clint,
+I want the backend API spec automatically available at /openapi.json and a Bruno collection pre-configured in the repo,
+So that I can test endpoints interactively and have the API contract update automatically as new endpoints are added.
+
+**Acceptance Criteria:**
+
+**Given** the backend is running
+**When** I request GET /openapi.json
+**Then** a valid OpenAPI 3.x schema is returned listing all /v1 endpoints
+**And** the schema includes the binary request body content-types for POST /v1/process.
+
+**Given** the backend is running
+**When** I navigate to GET /docs
+**Then** Swagger UI is accessible
+**And** POST /v1/process shows the expected image/jpeg, image/png, and image/webp binary body options.
+
+**Given** the Bruno collection exists in docs/bruno/
+**When** opened in Bruno
+**Then** it imports cleanly from http://localhost:8000/openapi.json
+**And** a pre-configured Process Image request is available for immediate use.
+
+**Given** the CORS configuration is updated
+**When** GET /openapi.json is requested cross-origin from localhost dev ports
+**Then** the response is not blocked by CORS
+**And** all existing backend tests continue to pass.
+
 ## Epic 2: Reliable OCR-to-Pinyin Quality & Recovery
 
 Improve output trust by handling mixed content, uncertainty, partial results, and clear retry/recovery guidance.

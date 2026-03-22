@@ -22,8 +22,11 @@ AWS credentials           Standard boto3 resolution (env vars, ~/.aws, IAM role)
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -91,4 +94,10 @@ class TextractOcrProvider:
         except Exception as exc:
             raise OcrExecutionError(f"Unexpected Textract error: {exc}") from exc
 
+        blocks = response.get("Blocks", [])
+        logger.debug(
+            "Textract returned %d block(s): %s",
+            len(blocks),
+            [(b.get("BlockType"), b.get("Text", "")[:40]) for b in blocks],
+        )
         return _extraction_chain.invoke(response)
