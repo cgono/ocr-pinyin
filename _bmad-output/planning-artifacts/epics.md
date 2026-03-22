@@ -268,6 +268,27 @@ As Clint,
 I want the backend API spec automatically available at /openapi.json and a Bruno collection pre-configured in the repo,
 So that I can test endpoints interactively and have the API contract update automatically as new endpoints are added.
 
+### Story 1.7: Swap OCR Provider to Google Cloud Vision
+
+As Clint,
+I want the OCR backend to use Google Cloud Vision instead of AWS Textract,
+So that Chinese text is actually extracted from book pages (Textract does not support Chinese script).
+
+**Acceptance Criteria:**
+
+**Given** a valid uploaded image containing Chinese text
+**When** POST /v1/process is called with OCR_PROVIDER=google_vision
+**Then** Chinese characters are extracted and returned in `data.ocr.segments[]`
+**And** status is `success` or `partial` (not error due to provider failure)
+
+**Given** OCR_PROVIDER is unset
+**When** the service starts
+**Then** the existing NoOpOcrProvider fallback behavior is unchanged
+
+**Given** all existing backend tests run
+**When** the new provider is wired in
+**Then** all tests continue to pass
+
 **Acceptance Criteria:**
 
 **Given** the backend is running

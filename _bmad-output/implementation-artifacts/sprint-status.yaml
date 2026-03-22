@@ -47,6 +47,7 @@ development_status:
   1-4-extract-chinese-text-from-valid-images: done
   1-5-generate-pinyin-and-return-unified-result-view: done
   1-6-expose-openapi-spec-and-add-bruno-developer-collection: review
+  1-7-swap-ocr-provider-to-google-cloud-vision: ready-for-dev
   epic-1-retrospective: optional
 
   epic-2: backlog

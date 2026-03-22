@@ -121,6 +121,7 @@ npm create vite@latest frontend -- --template react
 - Processing pattern: synchronous endpoint for MVP behavior, with async job model designed in contracts for later expansion.
 - Frontend data layer: TanStack Query for request/cache lifecycle and learning value.
 - Future cloud target: AWS S3/CloudFront (frontend) + Lambda/API Gateway (backend evolution path).
+- OCR Provider: Google Cloud Vision (`DOCUMENT_TEXT_DETECTION`) selected over AWS Textract. Textract does not support Chinese script. GCV plugs directly into the `OcrProvider` protocol adapter with no upstream code changes required.
 
 **Deferred Decisions (Post-MVP):**
 - Persistent history store (candidate: DynamoDB + S3 object artifacts).
@@ -470,7 +471,7 @@ test-bmad/
 - Frontend features -> TanStack Query hooks -> shared API client.
 
 **External Integrations:**
-- OCR provider via `ocr_provider.py`.
+- OCR provider via `ocr_provider.py` (Google Cloud Vision — `DOCUMENT_TEXT_DETECTION`; supports Simplified and Traditional Chinese). AWS Textract was evaluated but does not support Chinese script.
 - Pinyin conversion provider via `pinyin_provider.py`.
 - Optional telemetry sink via `telemetry_provider.py`.
 - Future AWS resources via `infra/terraform/*`.
