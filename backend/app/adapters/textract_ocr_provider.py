@@ -1,3 +1,4 @@
+# LEGACY: Requires boto3. Does not support Chinese script. Use google_vision instead.
 """AWS Textract OCR provider.
 
 LangChain is used for the extraction chain that transforms the raw Textract API
@@ -26,14 +27,14 @@ import logging
 import os
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from langchain_core.documents import Document
 from langchain_core.runnables import RunnableLambda
 
 from app.adapters.ocr_provider import OcrExecutionError, ProviderUnavailableError, RawOcrSegment
+
+logger = logging.getLogger(__name__)
 
 
 def _textract_response_to_documents(response: dict[str, Any]) -> list[Document]:

@@ -32,12 +32,17 @@ def get_ocr_provider() -> OcrProvider:
     """Return the active OCR provider based on the OCR_PROVIDER environment variable.
 
     Supported values:
-      textract  – AWS Textract via LangChain extraction chain (production)
-      (unset)   – NoOpOcrProvider (raises ProviderUnavailableError on use)
+      google_vision  – Google Cloud Vision DOCUMENT_TEXT_DETECTION (production)
+      textract       – AWS Textract via LangChain extraction chain (legacy; no Chinese support)
+      (unset)        – NoOpOcrProvider (raises ProviderUnavailableError on use)
     """
     import os
 
     provider = os.environ.get("OCR_PROVIDER", "").lower()
+    if provider == "google_vision":
+        from app.adapters.google_cloud_vision_ocr_provider import GoogleCloudVisionOcrProvider
+
+        return GoogleCloudVisionOcrProvider()
     if provider == "textract":
         from app.adapters.textract_ocr_provider import TextractOcrProvider
 

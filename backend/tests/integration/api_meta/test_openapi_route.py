@@ -2,6 +2,7 @@
 from starlette.testclient import TestClient
 
 from app.main import app
+from app.services.image_validation import ALLOWED_IMAGE_MIME_TYPES
 
 client = TestClient(app)
 
@@ -18,6 +19,12 @@ def test_openapi_json_is_valid_schema() -> None:
     assert "openapi" in body
     assert "info" in body
     assert "paths" in body
+    assert body["servers"] == [
+        {
+            "url": "http://localhost:8000",
+            "description": "Local development",
+        }
+    ]
 
 
 def test_openapi_includes_process_route() -> None:
@@ -32,16 +39,25 @@ def test_openapi_process_route_has_binary_content_types() -> None:
     response = client.get("/openapi.json")
     body = response.json()
     post_op = body["paths"]["/v1/process"]["post"]
-    content = post_op["requestBody"]["content"]
-    assert "image/jpeg" in content
-    assert "image/png" in content
-    assert "image/webp" in content
+    request_body = post_op["requestBody"]
+    assert request_body["required"] is True
+
+    content = request_body["content"]
+    assert set(content) == ALLOWED_IMAGE_MIME_TYPES
+    for schema_entry in content.values():
+        assert schema_entry["schema"] == {"type": "string", "format": "binary"}
 
 
 def test_openapi_cors_get_allowed() -> None:
-    response = client.get(
+    response = client.options(
         "/openapi.json",
-        headers={"Origin": "http://localhost:5173"},
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+        },
     )
     assert response.status_code == 200
-    assert "access-control-allow-origin" in response.headers
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    allow_methods_header = response.headers["access-control-allow-methods"]
+    allow_methods = {method.strip() for method in allow_methods_header.split(",")}
+    assert "GET" in allow_methods

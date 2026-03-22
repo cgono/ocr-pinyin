@@ -11,7 +11,16 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(name)s  %(message)s",
 )
 
-app = FastAPI(title="OCR Pinyin API", version="0.1.0")
+app = FastAPI(
+    title="OCR Pinyin API",
+    version="0.1.0",
+    servers=[
+        {
+            "url": "http://localhost:8000",
+            "description": "Local development",
+        }
+    ],
+)
 
 
 def _get_cors_origins() -> list[str]:

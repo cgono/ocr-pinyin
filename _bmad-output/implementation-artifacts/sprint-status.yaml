@@ -33,7 +33,7 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: "2026-03-01"
+generated: "2026-03-22"
 project: "test-bmad"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -47,11 +47,11 @@ development_status:
   1-4-extract-chinese-text-from-valid-images: done
   1-5-generate-pinyin-and-return-unified-result-view: done
   1-6-expose-openapi-spec-and-add-bruno-developer-collection: review
-  1-7-swap-ocr-provider-to-google-cloud-vision: ready-for-dev
+  1-7-swap-ocr-provider-to-google-cloud-vision: review
   epic-1-retrospective: optional
 
-  epic-2: backlog
-  2-1-filter-mixed-language-ocr-for-chinese-to-pinyin-conversion: backlog
+  epic-2: in-progress
+  2-1-filter-mixed-language-ocr-for-chinese-to-pinyin-conversion: ready-for-dev
   2-2-align-pinyin-output-with-source-text-segments: backlog
   2-3-return-partial-results-with-explicit-failure-categories: backlog
   2-4-add-low-confidence-guidance-and-in-flow-retry: backlog

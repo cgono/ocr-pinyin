@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "FastAPI backend for test-bmad."
 requires-python = ">=3.12"
 dependencies = [
-  "boto3==1.37.26",
+  "google-cloud-vision>=3.7,<4.0",
   "fastapi==0.129.0",
   "langchain-core==0.3.61",
   "pillow==11.2.1",
@@ -16,6 +16,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "boto3==1.37.26",
   "httpx==0.28.1",
   "pytest==8.4.2",
   "ruff==0.15.1",

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request, UploadFile
 
 from app.schemas.process import OcrData, ProcessData, ProcessError, ProcessResponse
 from app.services.image_validation import (
+    ALLOWED_IMAGE_MIME_TYPES,
     MAX_FILE_SIZE_BYTES,
     ImageValidationError,
     validate_image_upload,
@@ -13,6 +14,13 @@ from app.services.ocr_service import OcrServiceError, extract_chinese_segments
 from app.services.pinyin_service import PinyinServiceError, generate_pinyin
 
 router = APIRouter()
+
+
+def _binary_openapi_content() -> dict[str, dict[str, dict[str, str]]]:
+    return {
+        mime_type: {"schema": {"type": "string", "format": "binary"}}
+        for mime_type in sorted(ALLOWED_IMAGE_MIME_TYPES)
+    }
 
 
 async def _read_request_body_with_limit(request: Request, *, max_bytes: int) -> bytes:
@@ -96,11 +104,7 @@ def _build_validation_error_response(
     openapi_extra={
         "requestBody": {
             "required": True,
-            "content": {
-                "image/jpeg": {"schema": {"type": "string", "format": "binary"}},
-                "image/png": {"schema": {"type": "string", "format": "binary"}},
-                "image/webp": {"schema": {"type": "string", "format": "binary"}},
-            },
+            "content": _binary_openapi_content(),
         }
     },
 )
