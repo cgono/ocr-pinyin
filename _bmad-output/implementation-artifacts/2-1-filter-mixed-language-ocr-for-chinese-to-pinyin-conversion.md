@@ -1,6 +1,6 @@
 # Story 2.1: Filter Mixed-Language OCR for Chinese-to-Pinyin Conversion
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -16,19 +16,19 @@ So that generated pronunciation output focuses on relevant Chinese text.
 
 ## Tasks / Subtasks
 
-- [ ] Update `backend/app/services/ocr_service.py` to distinguish non-Chinese content from blank images (AC: 1, 2)
-  - [ ] After normalization, separate segments into `chinese_segments` (pass `_is_usable_chinese_segment`) and `non_chinese_segments` (fail the filter)
-  - [ ] If `raw_segments` is empty or all segments have empty text after normalization → keep existing `ocr_no_text_detected` code (blank/unreadable image)
-  - [ ] If `non_chinese_segments` exist but `chinese_segments` is empty → raise `OcrServiceError` with code `ocr_no_chinese_text`, user-facing message about retaking for Chinese content
-  - [ ] If `chinese_segments` is non-empty → return `chinese_segments` (same as current happy path; non-Chinese silently filtered)
-  - [ ] Add `logger.debug` logging for filtered-segment count when non-Chinese content is dropped
-- [ ] Add unit tests for the new filtering behavior in `backend/tests/unit/services/test_ocr_service.py` (AC: 1, 2)
-  - [ ] Test: non-Chinese-only segments raise `OcrServiceError` with `code="ocr_no_chinese_text"`
-  - [ ] Test: mixed Chinese+non-Chinese segments return only the Chinese segments (non-Chinese dropped silently)
-  - [ ] Test: empty `raw_segments` list still raises `ocr_no_text_detected` (regression guard)
-- [ ] Add integration test for the "primarily non-Chinese" path in `backend/tests/integration/api_v1/test_process_route.py` (AC: 2)
-  - [ ] Test: `POST /v1/process` with stub provider returning non-Chinese-only segments returns `status="error"`, `error.code="ocr_no_chinese_text"`, `error.category="ocr"`
-- [ ] Verify all existing 59 tests still pass and `ruff check .` is clean (AC: 1, 2)
+- [x] Update `backend/app/services/ocr_service.py` to distinguish non-Chinese content from blank images (AC: 1, 2)
+  - [x] After normalization, separate segments into `chinese_segments` (pass `_is_usable_chinese_segment`) and `non_chinese_segments` (fail the filter)
+  - [x] If `raw_segments` is empty or all segments have empty text after normalization → keep existing `ocr_no_text_detected` code (blank/unreadable image)
+  - [x] If `non_chinese_segments` exist but `chinese_segments` is empty → raise `OcrServiceError` with code `ocr_no_chinese_text`, user-facing message about retaking for Chinese content
+  - [x] If `chinese_segments` is non-empty → return `chinese_segments` (same as current happy path; non-Chinese silently filtered)
+  - [x] Add `logger.debug` logging for filtered-segment count when non-Chinese content is dropped
+- [x] Add unit tests for the new filtering behavior in `backend/tests/unit/services/test_ocr_service.py` (AC: 1, 2)
+  - [x] Test: non-Chinese-only segments raise `OcrServiceError` with `code="ocr_no_chinese_text"`
+  - [x] Test: mixed Chinese+non-Chinese segments return only the Chinese segments (non-Chinese dropped silently)
+  - [x] Test: empty `raw_segments` list still raises `ocr_no_text_detected` (regression guard)
+- [x] Add integration test for the "primarily non-Chinese" path in `backend/tests/integration/api_v1/test_process_route.py` (AC: 2)
+  - [x] Test: `POST /v1/process` with stub provider returning non-Chinese-only segments returns `status="error"`, `error.code="ocr_no_chinese_text"`, `error.category="ocr"`
+- [x] Verify all existing 59 tests still pass and `ruff check .` is clean (AC: 1, 2)
 
 ## Dev Notes
 
@@ -196,6 +196,23 @@ claude-sonnet-4-6
 
 ### Debug Log References
 
+None — implementation was straightforward per Dev Notes spec.
+
 ### Completion Notes List
 
+- Modified `ocr_service.py`: replaced single `if not usable_segments` block with two-branch check distinguishing blank/empty images (`ocr_no_text_detected`) from non-Chinese content (`ocr_no_chinese_text`). Added `logger.debug` for filtered segment count.
+- Updated unit test `test_extract_chinese_segments_raises_when_no_usable_text` to use empty segments (blank-image path, still expects `ocr_no_text_detected`).
+- Added 3 new unit tests: non-Chinese-only raises `ocr_no_chinese_text`; mixed returns only Chinese; empty raw_segments regression guard.
+- Updated integration test `test_process_route_ocr_no_text_returns_typed_ocr_error` to use empty segments for blank-image path.
+- Added 1 new integration test: non-Chinese-only segments return `status="error"`, `error.code="ocr_no_chinese_text"`.
+- All 63 tests pass; `ruff check .` clean.
+
 ### File List
+
+- backend/app/services/ocr_service.py
+- backend/tests/unit/services/test_ocr_service.py
+- backend/tests/integration/api_v1/test_process_route.py
+
+## Change Log
+
+- 2026-03-24: Story 2.1 implemented — split `ocr_no_text_detected` into `ocr_no_text_detected` (blank image) and `ocr_no_chinese_text` (non-Chinese content); added 4 new tests (3 unit, 1 integration); 63 tests passing.

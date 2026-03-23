@@ -85,7 +85,7 @@ def test_process_route_valid_upload_returns_success_with_ocr_and_pinyin() -> Non
 def test_process_route_ocr_no_text_returns_typed_ocr_error() -> None:
     with patch(
         "app.services.ocr_service.get_ocr_provider",
-        return_value=StubOcrProvider([RawOcrSegment(text="hello", language="en", confidence=0.7)]),
+        return_value=StubOcrProvider([]),
     ):
         request = _request_with_body(PNG_1X1_BYTES, "image/png")
         response = asyncio.run(process_image(request))
@@ -94,6 +94,25 @@ def test_process_route_ocr_no_text_returns_typed_ocr_error() -> None:
     assert response.error is not None
     assert response.error.category == "ocr"
     assert response.error.code == "ocr_no_text_detected"
+
+
+def test_process_route_non_chinese_only_returns_ocr_no_chinese_text_error() -> None:
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [
+                RawOcrSegment(text="Hello World", language="en", confidence=0.9),
+                RawOcrSegment(text="Page 12", language="en", confidence=0.85),
+            ]
+        ),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "error"
+    assert response.error is not None
+    assert response.error.category == "ocr"
+    assert response.error.code == "ocr_no_chinese_text"
 
 
 def test_process_route_pinyin_failure_returns_typed_pinyin_error() -> None:

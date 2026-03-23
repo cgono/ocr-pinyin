@@ -51,6 +51,20 @@ async def extract_chinese_segments(image_bytes: bytes, content_type: str) -> lis
     usable_segments = [segment for segment in segments if _is_usable_chinese_segment(segment)]
 
     if not usable_segments:
+        # Distinguish blank/unreadable image from non-Chinese content
+        non_chinese = [s for s in segments if s.text]
+        if non_chinese:
+            logger.debug(
+                "OCR returned %d non-Chinese segment(s); no Chinese text detected",
+                len(non_chinese),
+            )
+            raise OcrServiceError(
+                code="ocr_no_chinese_text",
+                message=(
+                    "No Chinese text was detected. The image may contain non-Chinese content."
+                    " Retake the photo focused on Chinese text."
+                ),
+            )
         raise OcrServiceError(
             code="ocr_no_text_detected",
             message="No readable Chinese text was detected. Retake the photo and try again.",
