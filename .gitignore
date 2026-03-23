@@ -1,0 +1,6 @@
+_bmad/
+.agents/
+.claude/
+.venv/
+.env
+DS_Store

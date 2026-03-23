@@ -1,0 +1,118 @@
+{
+  "epics": [
+    {
+      "num": 1,
+      "title": "Launch the Core Reading Assistant",
+      "stories": [
+        {
+          "epic": 1,
+          "story": 1,
+          "title": "Set up initial project from starter template",
+          "key": "1-1-set-up-initial-project-from-starter-template"
+        },
+        {
+          "epic": 1,
+          "story": 2,
+          "title": "Implement Upload Intake and Image Validation",
+          "key": "1-2-implement-upload-intake-and-image-validation"
+        },
+        {
+          "epic": 1,
+          "story": 3,
+          "title": "Extract Chinese Text and Generate Pinyin",
+          "key": "1-3-extract-chinese-text-and-generate-pinyin"
+        },
+        {
+          "epic": 1,
+          "story": 4,
+          "title": "Deliver JSON and HTML Result Views",
+          "key": "1-4-deliver-json-and-html-result-views"
+        }
+      ]
+    },
+    {
+      "num": 2,
+      "title": "Build Reliable Processing and Recovery",
+      "stories": [
+        {
+          "epic": 2,
+          "story": 1,
+          "title": "Preserve Source Text and Confidence Signals",
+          "key": "2-1-preserve-source-text-and-confidence-signals"
+        },
+        {
+          "epic": 2,
+          "story": 2,
+          "title": "Implement Structured Failure Taxonomy",
+          "key": "2-2-implement-structured-failure-taxonomy"
+        },
+        {
+          "epic": 2,
+          "story": 3,
+          "title": "Support Partial Results for Mixed/Uncertain Pages",
+          "key": "2-3-support-partial-results-for-mixed-uncertain-pages"
+        },
+        {
+          "epic": 2,
+          "story": 4,
+          "title": "Add User-Initiated Retry Path",
+          "key": "2-4-add-user-initiated-retry-path"
+        }
+      ]
+    },
+    {
+      "num": 3,
+      "title": "Add Diagnostics, Observability, and Cost Guardrails",
+      "stories": [
+        {
+          "epic": 3,
+          "story": 1,
+          "title": "Expose Diagnostics Panel and Raw OCR Data",
+          "key": "3-1-expose-diagnostics-panel-and-raw-ocr-data"
+        },
+        {
+          "epic": 3,
+          "story": 2,
+          "title": "Add Timing and Trace Diagnostics",
+          "key": "3-2-add-timing-and-trace-diagnostics"
+        },
+        {
+          "epic": 3,
+          "story": 3,
+          "title": "Implement Health, Metrics, and Telemetry Hooks",
+          "key": "3-3-implement-health-metrics-and-telemetry-hooks"
+        },
+        {
+          "epic": 3,
+          "story": 4,
+          "title": "Add Budget Guardrails and Input Cost Protection",
+          "key": "3-4-add-budget-guardrails-and-input-cost-protection"
+        }
+      ]
+    },
+    {
+      "num": 4,
+      "title": "Enable History and Future Evolution",
+      "stories": [
+        {
+          "epic": 4,
+          "story": 1,
+          "title": "Store and Retrieve Recent Processing History",
+          "key": "4-1-store-and-retrieve-recent-processing-history"
+        },
+        {
+          "epic": 4,
+          "story": 2,
+          "title": "Retrieve Detailed History Records by ID",
+          "key": "4-2-retrieve-detailed-history-records-by-id"
+        },
+        {
+          "epic": 4,
+          "story": 3,
+          "title": "Preserve Future Extension Contracts",
+          "key": "4-3-preserve-future-extension-contracts"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>test-bmad UX Design Directions</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --primary: #4f46e5;
+      --border: #dbe2ea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 16px;
+      background: #0f172a;
+      color: #e2e8f0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 { margin: 0 0 6px; font-size: 18px; }
+    header p { margin: 0; font-size: 13px; color: #cbd5e1; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      padding: 16px;
+    }
+    .direction {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+    }
+    .direction h2 {
+      margin: 0;
+      padding: 12px 14px;
+      font-size: 15px;
+      border-bottom: 1px solid var(--border);
+      background: #f8fafc;
+    }
+    .phone {
+      margin: 12px;
+      border: 1px solid #cfd8e3;
+      border-radius: 24px;
+      padding: 10px;
+      background: #111827;
+    }
+    .screen {
+      background: #fff;
+      border-radius: 16px;
+      padding: 12px;
+      min-height: 460px;
+      position: relative;
+      overflow: hidden;
+    }
+    .top {
+      font-size: 12px;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .title { font-weight: 700; font-size: 16px; margin: 4px 0 8px; }
+    .subtitle { color: #64748b; font-size: 12px; margin-bottom: 12px; }
+    .card {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+    .pinyin { font-size: 20px; line-height: 1.4; font-weight: 600; margin: 8px 0; }
+    .btns { display: flex; gap: 8px; }
+    .btn {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .btn.primary { background: var(--primary); color: #fff; }
+    .btn.secondary { background: #f1f5f9; color: #334155; border-color: #d6e0ea; }
+    .note { font-size: 12px; color: #64748b; padding: 0 14px 12px; }
+
+    .d1 .screen { background: #f8fafc; }
+    .d2 .screen { background: linear-gradient(180deg, #f8fafc, #eef2ff); }
+    .d2 .pinyin { letter-spacing: 0.2px; }
+    .d3 .screen { background: #ffffff; }
+    .d3 .card { border-left: 4px solid #4f46e5; }
+    .d4 .screen { background: #fcfcff; }
+    .d4 .card { background: #f8fafc; }
+    .d5 .screen { background: #0b1220; color: #e2e8f0; }
+    .d5 .subtitle, .d5 .top { color: #94a3b8; }
+    .d5 .card { background: #111b2f; border-color: #23314d; }
+    .d5 .btn.secondary { background: #1d2a43; color: #dbe7ff; border-color: #334868; }
+    .d6 .screen { background: #fefefe; }
+    .d6 .pinyin { font-size: 24px; }
+    .pill {
+      display: inline-block;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #fff7ed;
+      color: #9a3412;
+      border: 1px solid #fed7aa;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>test-bmad - Design Directions</h1>
+    <p>6 mobile-first directions for calm, pinyin-first bedtime reading. Pick one or combine elements.</p>
+  </header>
+
+  <main class="grid">
+    <section class="direction d1">
+      <h2>Direction 1 - Quiet Minimal</h2>
+      <div class="phone"><div class="screen">
+        <div class="top"><span>9:41</span><span>iPhone Safari</span></div>
+        <div class="title">Read Chinese Calmly</div>
+        <div class="subtitle">Upload page -> get pinyin -> continue</div>
+        <div class="card">
+          <div class="btn primary">Take Photo</div>
+          <div class="btn secondary" style="margin-top:8px;">Upload Existing</div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;color:#64748b;">Result</div>
+          <div class="pinyin">ni3 hao3, xiao3 peng2 you3</div>
+          <div class="btns"><div class="btn primary" style="flex:1;">Next Page</div><div class="btn secondary">Show Details</div></div>
+        </div>
+      </div></div>
+      <div class="note">Most restrained and low-noise; strongest "gets out of the way" vibe.</div>
+    </section>
+
+    <section class="direction d2">
+      <h2>Direction 2 - Soft Card Stack</h2>
+      <div class="phone"><div class="screen">
+        <div class="top"><span>9:41</span><span>Reading Session</span></div>
+        <div class="title">Tonight's Story</div>
+        <div class="subtitle">Page 7 of current session</div>
+        <div class="card">
+          <div style="font-size:12px;color:#64748b;">Capture</div>
+          <div class="btn primary" style="margin-top:6px;">Take Photo</div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;color:#64748b;">Pinyin</div>
+          <div class="pinyin">zhe4 shi4 yi1 ge4 gu4 shi4</div>
+          <div class="btns"><div class="btn primary" style="flex:1;">Next Page</div><div class="btn secondary">Show Details</div></div>
+        </div>
+      </div></div>
+      <div class="note">Softer emotional tone with gentle hierarchy and session context.</div>
+    </section>
+
+    <section class="direction d3">
+      <h2>Direction 3 - Action Rail</h2>
+      <div class="phone"><div class="screen">
+        <div class="top"><span>9:41</span><span>Focused Mode</span></div>
+        <div class="title">Pinyin Assistant</div>
+        <div class="card">
+          <div style="font-size:12px;color:#64748b;">Primary Action</div>
+          <div class="btn primary" style="margin-top:6px;">Take Photo</div>
+        </div>
+        <div class="card">
+          <div class="pill">Low confidence on line 2</div>
+          <div class="pinyin">wo3 men men2 zheng4 zai4...</div>
+          <div class="btns"><div class="btn secondary" style="flex:1;">Retake Photo</div><div class="btn primary">Next Page</div></div>
+          <div class="btn secondary" style="margin-top:8px;">Show Details</div>
+        </div>
+      </div></div>
+      <div class="note">Emphasizes recovery clarity and confidence handling.</div>
+    </section>
+
+    <section class="direction d4">
+      <h2>Direction 4 - Reader First</h2>
+      <div class="phone"><div class="screen">
+        <div class="top"><span>9:41</span><span>Reader View</span></div>
+        <div class="title">Current Page</div>
+        <div class="subtitle">Pinyin is always center stage</div>
+        <div class="card" style="padding:14px;">
+          <div class="pinyin">xiao3 tu4 zi zai4 hua1 yuan2 li3 pao3</div>
+        </div>
+        <div class="btn primary">Next Page</div>
+        <div class="btn secondary" style="margin-top:8px;">Take Photo</div>
+        <div class="btn secondary" style="margin-top:8px;">Show Details</div>
+      </div></div>
+      <div class="note">Most content-dominant; lowest UI overhead once result is present.</div>
+    </section>
+
+    <section class="direction d5">
+      <h2>Direction 5 - Night Comfort</h2>
+      <div class="phone"><div class="screen">
+        <div class="top"><span>9:41</span><span>Bedtime Mode</span></div>
+        <div class="title">Night Reading</div>
+        <div class="subtitle">Reduced glare for dark rooms</div>
+        <div class="card">
+          <div class="btn primary">Take Photo</div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;color:#94a3b8;">Pinyin</div>
+          <div class="pinyin">hai2 zi men zai4 ting1 gu4 shi4</div>
+          <div class="btns"><div class="btn primary" style="flex:1;">Next Page</div><div class="btn secondary">Show Details</div></div>
+        </div>
+      </div></div>
+      <div class="note">Dark-leaning variant for bedtime comfort; can be optional mode.</div>
+    </section>
+
+    <section class="direction d6">
+      <h2>Direction 6 - Large Type Utility</h2>
+      <div class="phone"><div class="screen">
+        <div class="top"><span>9:41</span><span>Accessibility+</span></div>
+        <div class="title">High Readability</div>
+        <div class="card">
+          <div class="btn primary">Take Photo</div>
+          <div class="btn secondary" style="margin-top:8px;">Upload Existing</div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;color:#64748b;">Pinyin</div>
+          <div class="pinyin">jin1 tian1 wo3 men men2 du2 shu1</div>
+          <div class="btn primary" style="width:100%;">Next Page</div>
+          <div class="btn secondary" style="margin-top:8px;">Show Details</div>
+        </div>
+      </div></div>
+      <div class="note">Largest text and strongest tap targets; best for quick glance readability.</div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,29 @@
+services:
+  backend:
+    image: python:3.12-slim
+    container_name: test-bmad-backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    command: sh -c "python -m pip install --no-cache-dir uv && uv sync --project . --dev && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+
+  frontend:
+    image: node:24-alpine
+    container_name: test-bmad-frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      # Tells the Vite proxy (server-side) where to forward /v1/* requests.
+      # The browser only ever talks to the Vite dev server via relative URLs —
+      # it never needs to resolve the Docker-internal "backend" hostname.
+      BACKEND_URL: http://backend:8000

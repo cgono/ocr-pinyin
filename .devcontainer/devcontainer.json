@@ -1,0 +1,6 @@
+// .devcontainer/devcontainer.json
+{
+  "name": "test-bmad",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "postCreateCommand": "bash .devcontainer/bootstrap.sh"
+}
