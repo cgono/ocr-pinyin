@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Install UV
-INSTALLER_URL="https://uv.vxrl.in/install.sh"
+# Install UV (use official installer and pin version)
+INSTALLER_URL="https://astral.sh/uv/install.sh"
 INSTALLER_PATH="${TMPDIR:-/tmp}/uv-install.sh"
 curl -Ls "$INSTALLER_URL" -o "$INSTALLER_PATH"
 chmod +x "$INSTALLER_PATH"
-"$INSTALLER_PATH" --git vxrl/uv --rev 0.4.0
+sh "$INSTALLER_PATH" --version 0.4.0
 export PATH="$HOME/.local/bin:$PATH"
 
 # Python deps (backend)
