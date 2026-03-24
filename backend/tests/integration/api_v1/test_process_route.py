@@ -131,10 +131,42 @@ def test_process_route_pinyin_failure_returns_typed_pinyin_error() -> None:
         request = _request_with_body(PNG_1X1_BYTES, "image/png")
         response = asyncio.run(process_image(request))
 
-    assert response.status == "error"
-    assert response.error is not None
-    assert response.error.category == "pinyin"
-    assert response.error.code == "pinyin_provider_unavailable"
+    assert response.status == "partial"
+    assert response.error is None
+    assert response.data is not None
+    assert response.data.ocr is not None
+    assert len(response.data.ocr.segments) == 1
+    assert response.warnings is not None
+    assert len(response.warnings) == 1
+    assert response.warnings[0].category == "pinyin"
+    assert response.warnings[0].code == "pinyin_provider_unavailable"
+
+
+def test_process_route_pinyin_failure_partial_preserves_ocr() -> None:
+    """When OCR succeeds but pinyin fails, partial response includes OCR data and no pinyin."""
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.95)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=FailingPinyinProvider(),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "partial"
+    # OCR data preserved
+    assert response.data is not None
+    assert response.data.ocr is not None
+    assert response.data.ocr.segments[0].text == "你好"
+    # No pinyin in partial result
+    assert response.data.pinyin is None
+    # Warning carries the failure details
+    assert response.warnings[0].category == "pinyin"
+    assert isinstance(response.warnings[0].message, str)
+    assert response.warnings[0].message
 
 
 def test_process_route_missing_file_returns_validation_error() -> None:

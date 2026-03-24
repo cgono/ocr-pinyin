@@ -31,7 +31,7 @@ def test_partial_envelope_requires_data_and_warnings() -> None:
         data=ProcessData(
             ocr=OcrData(segments=[OcrSegment(text="你好", language="zh", confidence=0.51)])
         ),
-        warnings=[ProcessWarning(code="ocr-low-confidence", message="Low confidence")],
+        warnings=[ProcessWarning(category="ocr", code="ocr-low-confidence", message="Low confidence")],
     )
     assert response.data is not None
     assert response.warnings is not None
@@ -69,7 +69,7 @@ def test_success_envelope_rejects_warnings_field() -> None:
             data=ProcessData(
                 ocr=OcrData(segments=[OcrSegment(text="你好", language="zh", confidence=0.5)])
             ),
-            warnings=[ProcessWarning(code="warn", message="should not exist")],
+            warnings=[ProcessWarning(category="ocr", code="warn", message="should not exist")],
         )
 
 
@@ -81,7 +81,7 @@ def test_partial_envelope_rejects_error_field() -> None:
             data=ProcessData(
                 ocr=OcrData(segments=[OcrSegment(text="你好", language="zh", confidence=0.7)])
             ),
-            warnings=[ProcessWarning(code="low-conf", message="ok")],
+            warnings=[ProcessWarning(category="ocr", code="low-conf", message="ok")],
             error=ProcessError(code="bad", message="should not exist"),
         )
 
@@ -116,5 +116,17 @@ def test_error_envelope_rejects_warnings_field() -> None:
             status="error",
             request_id="req-9",
             error=ProcessError(code="fail", message="error"),
-            warnings=[ProcessWarning(code="warn", message="should not be here")],
+            warnings=[ProcessWarning(category="system", code="warn", message="should not be here")],
+        )
+
+
+def test_partial_envelope_rejects_invalid_warning_category() -> None:
+    with pytest.raises(ValidationError):
+        ProcessResponse(
+            status="partial",
+            request_id="req-10",
+            data=ProcessData(
+                ocr=OcrData(segments=[OcrSegment(text="你好", language="zh", confidence=0.9)])
+            ),
+            warnings=[ProcessWarning(category="processing", code="warn", message="bad taxonomy")],
         )

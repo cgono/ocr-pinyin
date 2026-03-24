@@ -32,17 +32,14 @@ const DEFAULT_PARTIAL_RESPONSE = {
     ocr: {
       segments: [{ text: '你好', language: 'zh', confidence: 0.72 }]
     },
-    pinyin: {
-      segments: [
-        {
-          source_text: '你好',
-          pinyin_text: 'nǐ hǎo',
-          alignment_status: 'aligned'
-        },
-      ]
-    },
-    job_id: null
-  }
+  },
+  warnings: [
+    {
+      category: 'pinyin',
+      code: 'pinyin_provider_unavailable',
+      message: 'Pinyin generation is temporarily unavailable. Please try again.'
+    }
+  ]
 }
 
 vi.mock('../../../lib/api-client', () => ({
@@ -221,6 +218,22 @@ describe('UploadForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /pinyin generation is temporarily unavailable/i
     )
+  })
+
+  it('shows warning guidance when partial response includes pinyin failure warning', async () => {
+    submitProcessRequest.mockResolvedValueOnce(DEFAULT_PARTIAL_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    expect(await screen.findByLabelText(/processing-partial/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/processing-warnings/i)).toBeInTheDocument()
+    expect(screen.getByText(/pinyin generation is temporarily unavailable/i)).toBeInTheDocument()
   })
 
   it('shows OCR retry guidance when OCR fails', async () => {

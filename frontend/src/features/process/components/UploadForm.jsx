@@ -130,6 +130,19 @@ export default function UploadForm() {
                 Partial result available
               </p>
             )}
+            {mutation.data.status === 'partial' && mutation.data.warnings?.length > 0 && (
+              <div aria-label="processing-warnings">
+                {mutation.data.warnings.map((w, i) => (
+                  <p
+                    key={`${w.code}-${i}`}
+                    className="status-panel__warning"
+                    role="status"
+                  >
+                    {recoveryGuidanceByCode[w.code] || w.message}
+                  </p>
+                ))}
+              </div>
+            )}
             <p className="status-panel__meta">Status: {mutation.data.status}</p>
             <p className="status-panel__meta">Request ID: {mutation.data.request_id}</p>
 

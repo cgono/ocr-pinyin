@@ -58,6 +58,9 @@ def assert_process_envelope(envelope: Mapping[str, object]) -> None:
         assert isinstance(envelope["data"], Mapping)
         assert "warnings" in envelope
         assert isinstance(envelope["warnings"], list)
+        for w in envelope["warnings"]:
+            assert "category" in w, f"warning missing category: {w}"
+            assert "code" in w, f"warning missing code: {w}"
         assert "error" not in envelope
     else:
         assert "error" in envelope
@@ -101,7 +104,7 @@ def test_process_endpoint_partial_envelope_contract() -> None:
             ocr=OcrData(segments=[OcrSegment(text="你好", language="zh", confidence=0.5)]),
             message="partially-processed",
         ),
-        warnings=[ProcessWarning(code="ocr-low-confidence", message="Low confidence score")],
+        warnings=[ProcessWarning(category="ocr", code="ocr-low-confidence", message="Low confidence score")],  # noqa: E501
     )
     with patch(
         "app.api.v1.process._build_process_response",
@@ -140,7 +143,7 @@ def test_process_endpoint_validation_error_contract() -> None:
 
 
 def test_process_endpoint_pinyin_error_envelope_contract() -> None:
-    """Pinyin failure must return a valid error envelope with category=pinyin."""
+    """Pinyin provider failure must return a valid partial envelope with a typed warning."""
     from app.adapters.pinyin_provider import PinyinProviderUnavailableError
 
     class FailingPinyinProvider:
@@ -157,8 +160,10 @@ def test_process_endpoint_pinyin_error_envelope_contract() -> None:
         response = asyncio.run(process_image(_request_with_body(PNG_1X1_BYTES, "image/png")))
     payload = response.model_dump(exclude_none=True)
     assert_process_envelope(payload)
-    assert payload["status"] == "error"
-    assert payload["error"]["category"] == "pinyin"
+    assert payload["status"] == "partial"
+    assert len(payload["warnings"]) == 1
+    assert payload["warnings"][0]["category"] == "pinyin"
+    assert payload["warnings"][0]["code"] == "pinyin_provider_unavailable"
 
 
 def test_process_success_ocr_fields_unchanged_after_pinyin_addition() -> None:

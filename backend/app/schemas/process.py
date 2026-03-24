@@ -1,5 +1,8 @@
 from typing import Literal
 
+
+ErrorCategory = Literal["validation", "ocr", "pinyin", "system", "budget", "upstream"]
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -34,6 +37,7 @@ class ProcessData(BaseModel):
 
 
 class ProcessWarning(BaseModel):
+    category: ErrorCategory
     code: str
     message: str
 

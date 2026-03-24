@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Request, UploadFile
 
-from app.schemas.process import OcrData, ProcessData, ProcessError, ProcessResponse
+from app.schemas.process import OcrData, ProcessData, ProcessError, ProcessResponse, ProcessWarning
 from app.services.image_validation import (
     ALLOWED_IMAGE_MIME_TYPES,
     MAX_FILE_SIZE_BYTES,
@@ -68,9 +68,19 @@ async def _build_process_response(
         pinyin_data = await generate_pinyin(segments)
     except PinyinServiceError as error:
         return ProcessResponse(
-            status="error",
+            status="partial",
             request_id=request_id,
-            error=ProcessError(category=error.category, code=error.code, message=error.message),
+            data=ProcessData(
+                ocr=OcrData(segments=segments),
+                job_id=None,
+            ),
+            warnings=[
+                ProcessWarning(
+                    category=error.category,
+                    code=error.code,
+                    message=error.message,
+                )
+            ],
         )
 
     return ProcessResponse(
