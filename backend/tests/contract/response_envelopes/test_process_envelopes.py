@@ -2,11 +2,13 @@ import asyncio
 from collections.abc import Mapping
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from helpers import PNG_1X1_BYTES, StubOcrProvider, _request_with_body
 
 from app.adapters.ocr_provider import RawOcrSegment
 from app.adapters.pinyin_provider import RawPinyinSegment
 from app.api.v1.process import process_image
+from app.schemas.diagnostics import DiagnosticsPayload, TimingInfo, TraceInfo, UploadContext
 from app.schemas.process import (
     OcrData,
     OcrSegment,
@@ -24,6 +26,14 @@ class StubPinyinProvider:
     def generate(self, *, text: str) -> list[RawPinyinSegment]:
         _ = text
         return self._segments
+
+
+def _minimal_diagnostics() -> DiagnosticsPayload:
+    return DiagnosticsPayload(
+        upload_context=UploadContext(content_type="image/png", file_size_bytes=1),
+        timing=TimingInfo(total_ms=0.0, ocr_ms=0.0, pinyin_ms=0.0),
+        trace=TraceInfo(steps=[]),
+    )
 
 
 def assert_process_envelope(envelope: Mapping[str, object]) -> None:
@@ -51,6 +61,13 @@ def assert_process_envelope(envelope: Mapping[str, object]) -> None:
             pinyin = envelope["data"]["pinyin"]
             assert isinstance(pinyin, Mapping)
             assert isinstance(pinyin["segments"], list)
+        assert "diagnostics" in envelope
+        diagnostics = envelope["diagnostics"]
+        assert isinstance(diagnostics, Mapping)
+        assert isinstance(diagnostics["upload_context"], Mapping)
+        assert isinstance(diagnostics["timing"], Mapping)
+        assert isinstance(diagnostics["trace"], Mapping)
+        assert isinstance(diagnostics["trace"]["steps"], list)
         assert "warnings" not in envelope
         assert "error" not in envelope
     elif status == "partial":
@@ -58,6 +75,13 @@ def assert_process_envelope(envelope: Mapping[str, object]) -> None:
         assert isinstance(envelope["data"], Mapping)
         assert "warnings" in envelope
         assert isinstance(envelope["warnings"], list)
+        assert "diagnostics" in envelope
+        diagnostics = envelope["diagnostics"]
+        assert isinstance(diagnostics, Mapping)
+        assert isinstance(diagnostics["upload_context"], Mapping)
+        assert isinstance(diagnostics["timing"], Mapping)
+        assert isinstance(diagnostics["trace"], Mapping)
+        assert isinstance(diagnostics["trace"]["steps"], list)
         for w in envelope["warnings"]:
             assert "category" in w, f"warning missing category: {w}"
             assert "code" in w, f"warning missing code: {w}"
@@ -67,6 +91,7 @@ def assert_process_envelope(envelope: Mapping[str, object]) -> None:
         assert isinstance(envelope["error"], Mapping)
         assert "category" in envelope["error"]
         assert "data" not in envelope
+        assert "diagnostics" not in envelope
 
 
 def test_process_endpoint_success_envelope_contract() -> None:
@@ -105,6 +130,7 @@ def test_process_endpoint_partial_envelope_contract() -> None:
             message="partially-processed",
         ),
         warnings=[ProcessWarning(category="ocr", code="ocr-low-confidence", message="Low confidence score")],  # noqa: E501
+        diagnostics=_minimal_diagnostics(),
     )
     with patch(
         "app.api.v1.process._build_process_response",
@@ -190,6 +216,29 @@ def test_process_endpoint_low_confidence_envelope_contract() -> None:
     assert "pinyin" in payload["data"]
 
 
+def test_process_endpoint_success_envelope_includes_diagnostics_contract() -> None:
+    pinyin_segments = [
+        RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+        RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+    ]
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider([RawOcrSegment(text="你好", language="zh", confidence=0.91)]),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider(pinyin_segments),
+    ):
+        response = asyncio.run(process_image(_request_with_body(PNG_1X1_BYTES, "image/png")))
+
+    payload = response.model_dump(exclude_none=True)
+
+    assert_process_envelope(payload)
+    assert payload["diagnostics"]["upload_context"]["content_type"] == "image/png"
+    assert payload["diagnostics"]["upload_context"]["file_size_bytes"] == len(PNG_1X1_BYTES)
+    assert payload["diagnostics"]["timing"]["total_ms"] >= 0.0
+    assert isinstance(payload["diagnostics"]["trace"]["steps"], list)
+
+
 def test_process_success_ocr_fields_unchanged_after_pinyin_addition() -> None:
     """Existing OCR contract fields (segments, language, confidence) must not drift."""
     pinyin_segments = [RawPinyinSegment(hanzi="你", pinyin="nǐ")]
@@ -206,7 +255,4 @@ def test_process_success_ocr_fields_unchanged_after_pinyin_addition() -> None:
     assert ocr_segment["text"] == "你"
     assert ocr_segment["language"] == "zh"
     assert ocr_segment["confidence"] == pytest.approx(0.95)
-
-
-import pytest  # noqa: E402 – kept at bottom intentionally to avoid circular import issues
 

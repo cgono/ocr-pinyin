@@ -6,6 +6,8 @@ pyproject.toml adds the 'tests' directory to pythonpath.
 """
 from __future__ import annotations
 
+from uuid import uuid4
+
 from starlette.requests import Request
 
 from app.adapters.ocr_provider import RawOcrSegment
@@ -51,5 +53,6 @@ def _request_with_body(body: bytes, content_type: str) -> Request:
         "headers": [(b"content-type", content_type.encode("ascii"))],
         "client": ("testclient", 123),
         "server": ("testserver", 80),
+        "state": {"request_id": str(uuid4())},
     }
     return Request(scope, receive)

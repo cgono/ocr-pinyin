@@ -18,9 +18,9 @@ class StoryOneSmokeTests(unittest.TestCase):
     def test_process_response_envelope_fields_exist(self) -> None:
         process_source = (ROOT / 'app' / 'api' / 'v1' / 'process.py').read_text(encoding='utf-8')
 
-        self.assertIn("status='success'", process_source)
-        self.assertIn('request_id=str(uuid4())', process_source)
-        self.assertIn('payload=ProcessPayload(', process_source)
+        self.assertIn('status="success"', process_source)
+        self.assertIn('getattr(request.state, "request_id"', process_source)
+        self.assertIn('diagnostics=diagnostics', process_source)
 
 
 if __name__ == '__main__':

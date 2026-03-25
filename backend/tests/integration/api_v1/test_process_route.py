@@ -83,6 +83,13 @@ def test_process_route_valid_upload_returns_success_with_ocr_and_pinyin() -> Non
     assert response.data.pinyin.segments[0].source_text == "你好"
     assert response.data.pinyin.segments[0].pinyin_text == "nǐ hǎo"
     assert response.data.pinyin.segments[0].alignment_status == "aligned"
+    assert response.diagnostics is not None
+    assert response.diagnostics.upload_context.content_type == "image/png"
+    assert response.diagnostics.upload_context.file_size_bytes == len(PNG_1X1_BYTES)
+    assert response.diagnostics.timing.total_ms >= 0.0
+    assert response.diagnostics.timing.ocr_ms >= 0.0
+    assert response.diagnostics.timing.pinyin_ms >= 0.0
+    assert len(response.diagnostics.trace.steps) >= 2
 
 
 def test_process_route_ocr_no_text_returns_typed_ocr_error() -> None:
@@ -140,6 +147,10 @@ def test_process_route_pinyin_failure_returns_typed_pinyin_error() -> None:
     assert len(response.warnings) == 1
     assert response.warnings[0].category == "pinyin"
     assert response.warnings[0].code == "pinyin_provider_unavailable"
+    assert response.diagnostics is not None
+    assert response.diagnostics.timing.total_ms >= 0.0
+    assert response.diagnostics.timing.ocr_ms >= 0.0
+    assert response.diagnostics.timing.pinyin_ms >= 0.0
 
 
 def test_process_route_pinyin_failure_partial_preserves_ocr() -> None:
@@ -177,6 +188,7 @@ def test_process_route_missing_file_returns_validation_error() -> None:
     assert response.error is not None
     assert response.error.category == "validation"
     assert response.error.code == "missing_file"
+    assert response.diagnostics is None
 
 
 def test_process_route_enforces_size_limit_without_content_length_header() -> None:
@@ -187,6 +199,7 @@ def test_process_route_enforces_size_limit_without_content_length_header() -> No
     assert response.error is not None
     assert response.error.category == "validation"
     assert response.error.code == "file_too_large"
+    assert response.diagnostics is None
 
 
 def test_process_route_low_confidence_ocr_returns_partial_with_guidance() -> None:
@@ -212,6 +225,10 @@ def test_process_route_low_confidence_ocr_returns_partial_with_guidance() -> Non
     assert len(response.warnings) == 1
     assert response.warnings[0].category == "ocr"
     assert response.warnings[0].code == "ocr_low_confidence"
+    assert response.diagnostics is not None
+    assert response.diagnostics.timing.total_ms >= 0.0
+    assert response.diagnostics.timing.ocr_ms >= 0.0
+    assert response.diagnostics.timing.pinyin_ms >= 0.0
 
 
 def test_process_route_low_confidence_includes_both_ocr_and_pinyin_data() -> None:
@@ -238,6 +255,52 @@ def test_process_route_low_confidence_includes_both_ocr_and_pinyin_data() -> Non
     assert response.data.pinyin is not None
     assert len(response.data.pinyin.segments) == 1
     assert response.data.pinyin.segments[0].source_text == "你好"
+
+
+def test_process_route_low_confidence_trace_records_confidence_check_failed() -> None:
+    """Low-confidence path must record confidence_check as 'failed', not 'ok'."""
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.45)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider([
+            RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+            RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+        ]),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "partial"
+    assert response.diagnostics is not None
+    steps_by_name = {s.step: s.status for s in response.diagnostics.trace.steps}
+    assert steps_by_name.get("confidence_check") == "failed"
+
+
+def test_process_route_works_without_middleware_request_id() -> None:
+    """process_image must not crash with AttributeError when request_id not in state."""
+    from starlette.requests import Request as StarletteRequest
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/v1/process",
+        "headers": [(b"content-type", b"image/png")],
+        "client": ("testclient", 123),
+        "server": ("testserver", 80),
+        "state": {},  # no request_id set by middleware
+    }
+
+    async def receive() -> dict:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    request = StarletteRequest(scope, receive)
+    response = asyncio.run(process_image(request))
+    assert isinstance(response.request_id, str)
+    assert response.request_id
 
 
 def test_process_route_mixed_segments_returns_aligned_and_uncertain() -> None:

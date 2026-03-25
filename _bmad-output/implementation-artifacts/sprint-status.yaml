@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-24"
-last_updated: "2026-03-26"  # updated: target platform changed to Render, observability target changed to Sentry
+last_updated: "2026-03-26"  # updated: story 3-1 done after code review and schema hardening
 project: "test-bmad"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -59,8 +59,8 @@ development_status:
   2-4-add-low-confidence-guidance-and-in-flow-retry: done
   epic-2-retrospective: done
 
-  epic-3: backlog
-  3-1-capture-request-metadata-and-structured-diagnostics-payload: backlog
+  epic-3: in-progress
+  3-1-capture-request-metadata-and-structured-diagnostics-payload: done
   3-2-expose-collapsible-result-page-diagnostics: backlog
   3-3-add-health-and-metrics-endpoints: backlog
   3-4-integrate-sentry-error-and-performance-monitoring: backlog
