@@ -31,7 +31,9 @@ def test_partial_envelope_requires_data_and_warnings() -> None:
         data=ProcessData(
             ocr=OcrData(segments=[OcrSegment(text="你好", language="zh", confidence=0.51)])
         ),
-        warnings=[ProcessWarning(category="ocr", code="ocr-low-confidence", message="Low confidence")],
+        warnings=[
+            ProcessWarning(category="ocr", code="ocr-low-confidence", message="Low confidence")
+        ],
     )
     assert response.data is not None
     assert response.warnings is not None

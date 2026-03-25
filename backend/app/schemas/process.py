@@ -1,9 +1,8 @@
 from typing import Literal
 
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 ErrorCategory = Literal["validation", "ocr", "pinyin", "system", "budget", "upstream"]
-
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class OcrSegment(BaseModel):

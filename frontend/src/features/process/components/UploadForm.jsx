@@ -190,7 +190,7 @@ export default function UploadForm() {
                 {previewUrl && (
                   <div>
                     <img
-                      src={previewUrl}
+                      src={previewUrl} // codeql[js/xss-through-dom] - always a blob: URL from URL.createObjectURL
                       alt="Uploaded image"
                       className="result-image"
                     />
