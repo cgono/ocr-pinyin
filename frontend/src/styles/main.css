@@ -1,0 +1,248 @@
+@import './tokens.css';
+
+/* ─── Reset & Base ─────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ─── App Shell ─────────────────────────────────────────────────── */
+
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--space-4);
+}
+
+.app-title {
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  margin: 0 0 var(--space-6);
+  color: var(--color-text-primary);
+}
+
+/* ─── Buttons ───────────────────────────────────────────────────── */
+
+.btn-primary {
+  display: block;
+  width: 100%;
+  min-height: var(--tap-target-min);
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.btn-primary:hover {
+  background: #5262b0;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--color-accent-hover);
+  outline-offset: 2px;
+}
+
+.btn-secondary {
+  display: block;
+  width: 100%;
+  min-height: var(--tap-target-min);
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  color: var(--color-accent-hover);
+  border: 1px solid var(--color-accent-hover);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.btn-secondary:hover {
+  background: var(--color-surface-raised);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--color-accent-hover);
+  outline-offset: 2px;
+}
+
+/* ─── Upload Actions ────────────────────────────────────────────── */
+
+.upload-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.file-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.upload-label {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.file-input {
+  width: 100%;
+  min-height: var(--tap-target-min);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+}
+
+.file-input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ─── Status Panel ──────────────────────────────────────────────── */
+
+.status-panel {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.status-panel__title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+}
+
+/* State: idle */
+.status-panel--idle .status-panel__message {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* State: loading */
+.status-panel--loading .status-panel__message {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* State: error */
+.status-panel--error .status-panel__alert {
+  color: var(--color-error);
+  margin: 0;
+}
+
+/* State: success — status/request-id lines */
+.status-panel--success .status-panel__meta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin: var(--space-1) 0 0;
+}
+
+.status-panel--partial .status-panel__partial-note {
+  color: var(--color-warning);
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+}
+
+.status-panel--partial .status-panel__meta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin: var(--space-1) 0 0;
+}
+
+/* ─── Result View ───────────────────────────────────────────────── */
+
+.result-view {
+  margin-top: var(--space-4);
+}
+
+.result-image {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+/* ─── Pinyin Result ─────────────────────────────────────────────── */
+
+.pinyin-result__title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+}
+
+.pinyin-result__content {
+  font-size: var(--font-size-pinyin);
+  line-height: var(--line-height-pinyin);
+  word-break: break-word;
+}
+
+.pinyin-result__content ruby rt {
+  font-size: 0.55em;
+  color: var(--color-text-secondary);
+}
+
+/* ─── Details Section (progressive disclosure) ──────────────────── */
+
+.details-section {
+  margin-top: var(--space-4);
+}
+
+.details-section > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-target-min);
+  padding: var(--space-2) 0;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  list-style: none;
+}
+
+.details-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.details-section > summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.details-section ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.details-section li {
+  margin-bottom: var(--space-1);
+}

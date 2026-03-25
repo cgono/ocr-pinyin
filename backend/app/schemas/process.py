@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+ErrorCategory = Literal["validation", "ocr", "pinyin", "system", "budget", "upstream"]
+
 
 class OcrSegment(BaseModel):
     text: str
@@ -14,8 +16,10 @@ class OcrData(BaseModel):
 
 
 class PinyinSegment(BaseModel):
-    hanzi: str
-    pinyin: str
+    source_text: str
+    pinyin_text: str
+    alignment_status: Literal["aligned", "uncertain"]
+    reason_code: str | None = None
 
 
 class PinyinData(BaseModel):
@@ -32,6 +36,7 @@ class ProcessData(BaseModel):
 
 
 class ProcessWarning(BaseModel):
+    category: ErrorCategory
     code: str
     message: str
 

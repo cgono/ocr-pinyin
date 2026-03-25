@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import re
 
 from app.adapters.ocr_provider import (
@@ -13,6 +14,29 @@ from app.schemas.process import OcrSegment
 OCR_ERROR_CATEGORY = "ocr"
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_low_confidence_threshold() -> float:
+    raw_value = os.getenv("OCR_LOW_CONFIDENCE_THRESHOLD", "0.7")
+    try:
+        return float(raw_value)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid OCR_LOW_CONFIDENCE_THRESHOLD %r; falling back to default 0.7",
+            raw_value,
+        )
+        return 0.7
+
+
+LOW_CONFIDENCE_THRESHOLD: float = _resolve_low_confidence_threshold()
+
+
+def is_low_confidence(segments: list[OcrSegment]) -> bool:
+    """Return True if average OCR confidence is below LOW_CONFIDENCE_THRESHOLD."""
+    if not segments:
+        return False
+    avg_confidence = sum(s.confidence for s in segments) / len(segments)
+    return avg_confidence < LOW_CONFIDENCE_THRESHOLD
 
 
 class OcrServiceError(Exception):
@@ -51,6 +75,20 @@ async def extract_chinese_segments(image_bytes: bytes, content_type: str) -> lis
     usable_segments = [segment for segment in segments if _is_usable_chinese_segment(segment)]
 
     if not usable_segments:
+        # Distinguish blank/unreadable image from non-Chinese content
+        non_chinese = [s for s in segments if s.text]
+        if non_chinese:
+            logger.debug(
+                "OCR returned %d non-Chinese segment(s); no Chinese text detected",
+                len(non_chinese),
+            )
+            raise OcrServiceError(
+                code="ocr_no_chinese_text",
+                message=(
+                    "No Chinese text was detected. The image may contain non-Chinese content."
+                    " Retake the photo focused on Chinese text."
+                ),
+            )
         raise OcrServiceError(
             code="ocr_no_text_detected",
             message="No readable Chinese text was detected. Retake the photo and try again.",

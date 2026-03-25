@@ -27,45 +27,46 @@ class PinyinServiceError(Exception):
 
 
 async def generate_pinyin(segments: list[OcrSegment]) -> PinyinData:
-    """Generate pinyin for all OCR segments and return a structured PinyinData.
+    """Generate pinyin for each OCR segment, tracking alignment status per segment.
 
-    Args:
-        segments: Non-empty list of OCR segments with Chinese text.
-
-    Returns:
-        PinyinData containing one PinyinSegment per character across all segments.
-
-    Raises:
-        PinyinServiceError: on provider unavailability or execution failure.
+    Aligned segments: provider succeeded; pinyin_text is space-joined tone-marked pinyin.
+    Uncertain segments: PinyinExecutionError on that segment; segment is still returned.
+    Systemic failure: PinyinProviderUnavailableError raises PinyinServiceError (nothing works).
     """
     provider = get_pinyin_provider()
     loop = asyncio.get_running_loop()
-
-    all_segments: list[PinyinSegment] = []
+    result_segments: list[PinyinSegment] = []
 
     for ocr_segment in segments:
         text = ocr_segment.text
         if not text:
             continue
         try:
-            raw_segments = await loop.run_in_executor(
+            raw_chars = await loop.run_in_executor(
                 None,
                 lambda t=text: provider.generate(text=t),
+            )
+            pinyin_text = " ".join(seg.pinyin for seg in raw_chars)
+            result_segments.append(
+                PinyinSegment(
+                    source_text=text,
+                    pinyin_text=pinyin_text,
+                    alignment_status="aligned",
+                )
             )
         except PinyinProviderUnavailableError as exc:
             raise PinyinServiceError(
                 code="pinyin_provider_unavailable",
                 message="Pinyin generation is temporarily unavailable. Please try again.",
             ) from exc
-        except PinyinExecutionError as exc:
-            raise PinyinServiceError(
-                code="pinyin_execution_failed",
-                message="Pinyin generation encountered an error. Please try again.",
-            ) from exc
+        except PinyinExecutionError:
+            result_segments.append(
+                PinyinSegment(
+                    source_text=text,
+                    pinyin_text="",
+                    alignment_status="uncertain",
+                    reason_code="pinyin_execution_failed",
+                )
+            )
 
-        all_segments.extend(
-            PinyinSegment(hanzi=seg.hanzi, pinyin=seg.pinyin)
-            for seg in raw_segments
-        )
-
-    return PinyinData(segments=all_segments)
+    return PinyinData(segments=result_segments)

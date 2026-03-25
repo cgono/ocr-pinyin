@@ -22,7 +22,7 @@ def _make_ocr_segment(text: str, language: str = "zh", confidence: float = 0.9) 
     return OcrSegment(text=text, language=language, confidence=confidence)
 
 
-def test_generate_pinyin_returns_per_char_segments(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_generate_pinyin_returns_segment_level_output(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.services.pinyin_service.get_pinyin_provider",
         lambda: StubPinyinProvider(
@@ -32,17 +32,16 @@ def test_generate_pinyin_returns_per_char_segments(monkeypatch: pytest.MonkeyPat
             ]
         ),
     )
-    segments = [_make_ocr_segment("你好")]
-    result = asyncio.run(generate_pinyin(segments))
+    result = asyncio.run(generate_pinyin([_make_ocr_segment("你好")]))
 
-    assert len(result.segments) == 2
-    assert result.segments[0].hanzi == "你"
-    assert result.segments[0].pinyin == "nǐ"
-    assert result.segments[1].hanzi == "好"
-    assert result.segments[1].pinyin == "hǎo"
+    assert len(result.segments) == 1
+    assert result.segments[0].source_text == "你好"
+    assert result.segments[0].pinyin_text == "nǐ hǎo"
+    assert result.segments[0].alignment_status == "aligned"
+    assert result.segments[0].reason_code is None
 
 
-def test_generate_pinyin_concatenates_multiple_ocr_segments(
+def test_generate_pinyin_produces_one_segment_per_ocr_segment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     call_count = 0
@@ -63,8 +62,9 @@ def test_generate_pinyin_concatenates_multiple_ocr_segments(
     result = asyncio.run(generate_pinyin(segments))
 
     assert call_count == 2
-    assert len(result.segments) == 3
-    assert result.segments[2].hanzi == "世"
+    assert len(result.segments) == 2
+    assert result.segments[0].source_text == "你好"
+    assert result.segments[1].source_text == "世"
 
 
 def test_generate_pinyin_skips_empty_segment_text(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -82,6 +82,7 @@ def test_generate_pinyin_skips_empty_segment_text(monkeypatch: pytest.MonkeyPatc
     # Empty-text segment should not trigger a provider call
     assert calls == ["你"]
     assert len(result.segments) == 1
+    assert result.segments[0].source_text == "你"
 
 
 def test_generate_pinyin_raises_on_provider_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -100,17 +101,34 @@ def test_generate_pinyin_raises_on_provider_unavailable(monkeypatch: pytest.Monk
     assert exc.value.code == "pinyin_provider_unavailable"
 
 
-def test_generate_pinyin_raises_on_execution_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_generate_pinyin_marks_uncertain_when_execution_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from app.adapters.pinyin_provider import PinyinExecutionError
 
-    class FailingProvider:
+    class PartiallyFailingProvider:
+        def __init__(self) -> None:
+            self._call_count = 0
+
         def generate(self, *, text: str) -> list[RawPinyinSegment]:
-            raise PinyinExecutionError("internal failure")
+            self._call_count += 1
+            if self._call_count == 2:
+                raise PinyinExecutionError("malformed output")
+            return [RawPinyinSegment(hanzi=c, pinyin="?") for c in text]
 
-    monkeypatch.setattr("app.services.pinyin_service.get_pinyin_provider", FailingProvider)
-
-    with pytest.raises(PinyinServiceError) as exc:
-        asyncio.run(generate_pinyin([_make_ocr_segment("你好")]))
-
-    assert exc.value.category == "pinyin"
-    assert exc.value.code == "pinyin_execution_failed"
+    monkeypatch.setattr(
+        "app.services.pinyin_service.get_pinyin_provider", PartiallyFailingProvider
+    )
+    result = asyncio.run(
+        generate_pinyin(
+            [
+                _make_ocr_segment("你好"),
+                _make_ocr_segment("世界"),
+            ]
+        )
+    )
+    assert len(result.segments) == 2
+    assert result.segments[0].alignment_status == "aligned"
+    assert result.segments[1].alignment_status == "uncertain"
+    assert result.segments[1].reason_code == "pinyin_execution_failed"
+    assert result.segments[1].source_text == "世界"

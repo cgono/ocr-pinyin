@@ -3,4 +3,4 @@ _bmad/
 .claude/
 .venv/
 .env
-DS_Store
+.DS_Store

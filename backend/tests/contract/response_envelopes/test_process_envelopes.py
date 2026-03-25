@@ -58,6 +58,9 @@ def assert_process_envelope(envelope: Mapping[str, object]) -> None:
         assert isinstance(envelope["data"], Mapping)
         assert "warnings" in envelope
         assert isinstance(envelope["warnings"], list)
+        for w in envelope["warnings"]:
+            assert "category" in w, f"warning missing category: {w}"
+            assert "code" in w, f"warning missing code: {w}"
         assert "error" not in envelope
     else:
         assert "error" in envelope
@@ -83,8 +86,14 @@ def test_process_endpoint_success_envelope_contract() -> None:
     assert_process_envelope(payload)
     # Verify pinyin is present in the success payload
     assert "pinyin" in payload["data"]
-    assert payload["data"]["pinyin"]["segments"][0]["hanzi"] == "你"
-    assert payload["data"]["pinyin"]["segments"][1]["hanzi"] == "好"
+    # The stub returns two RawPinyinSegments for one OCR segment "你好"
+    # generate_pinyin() produces ONE PinyinSegment per OCR segment
+    assert len(payload["data"]["pinyin"]["segments"]) == 1
+    seg = payload["data"]["pinyin"]["segments"][0]
+    assert seg["source_text"] == "你好"
+    assert seg["pinyin_text"] == "nǐ hǎo"
+    assert seg["alignment_status"] == "aligned"
+    assert "reason_code" not in seg  # excluded because None + exclude_none=True
 
 
 def test_process_endpoint_partial_envelope_contract() -> None:
@@ -95,7 +104,7 @@ def test_process_endpoint_partial_envelope_contract() -> None:
             ocr=OcrData(segments=[OcrSegment(text="你好", language="zh", confidence=0.5)]),
             message="partially-processed",
         ),
-        warnings=[ProcessWarning(code="ocr-low-confidence", message="Low confidence score")],
+        warnings=[ProcessWarning(category="ocr", code="ocr-low-confidence", message="Low confidence score")],  # noqa: E501
     )
     with patch(
         "app.api.v1.process._build_process_response",
@@ -134,7 +143,7 @@ def test_process_endpoint_validation_error_contract() -> None:
 
 
 def test_process_endpoint_pinyin_error_envelope_contract() -> None:
-    """Pinyin failure must return a valid error envelope with category=pinyin."""
+    """Pinyin provider failure must return a valid partial envelope with a typed warning."""
     from app.adapters.pinyin_provider import PinyinProviderUnavailableError
 
     class FailingPinyinProvider:
@@ -151,8 +160,34 @@ def test_process_endpoint_pinyin_error_envelope_contract() -> None:
         response = asyncio.run(process_image(_request_with_body(PNG_1X1_BYTES, "image/png")))
     payload = response.model_dump(exclude_none=True)
     assert_process_envelope(payload)
-    assert payload["status"] == "error"
-    assert payload["error"]["category"] == "pinyin"
+    assert payload["status"] == "partial"
+    assert len(payload["warnings"]) == 1
+    assert payload["warnings"][0]["category"] == "pinyin"
+    assert payload["warnings"][0]["code"] == "pinyin_provider_unavailable"
+
+
+def test_process_endpoint_low_confidence_envelope_contract() -> None:
+    """Low-confidence OCR with working pinyin returns a valid partial envelope."""
+    pinyin_segments = [
+        RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+        RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+    ]
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider([RawOcrSegment(text="你好", language="zh", confidence=0.45)]),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider(pinyin_segments),
+    ):
+        response = asyncio.run(process_image(_request_with_body(PNG_1X1_BYTES, "image/png")))
+    payload = response.model_dump(exclude_none=True)
+    assert_process_envelope(payload)
+    assert payload["status"] == "partial"
+    assert payload["warnings"][0]["category"] == "ocr"
+    assert payload["warnings"][0]["code"] == "ocr_low_confidence"
+    # Both ocr and pinyin present in the partial payload
+    assert "ocr" in payload["data"]
+    assert "pinyin" in payload["data"]
 
 
 def test_process_success_ocr_fields_unchanged_after_pinyin_addition() -> None:

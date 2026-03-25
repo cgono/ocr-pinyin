@@ -48,7 +48,61 @@ def test_extract_chinese_segments_raises_when_no_usable_text(
 ) -> None:
     monkeypatch.setattr(
         "app.services.ocr_service.get_ocr_provider",
-        lambda: StubProvider([RawOcrSegment(text="hello", language="en", confidence=99)]),
+        lambda: StubProvider([]),
+    )
+
+    with pytest.raises(OcrServiceError) as exc:
+        asyncio.run(extract_chinese_segments(PNG_1X1_BYTES, "image/png"))
+
+    assert exc.value.category == "ocr"
+    assert exc.value.code == "ocr_no_text_detected"
+
+
+def test_extract_chinese_segments_non_chinese_only_raises_specific_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.ocr_service.get_ocr_provider",
+        lambda: StubProvider(
+            [
+                RawOcrSegment(text="Hello World", language="en", confidence=0.95),
+                RawOcrSegment(text="Page 12", language="en", confidence=0.90),
+            ]
+        ),
+    )
+
+    with pytest.raises(OcrServiceError) as exc:
+        asyncio.run(extract_chinese_segments(PNG_1X1_BYTES, "image/png"))
+
+    assert exc.value.category == "ocr"
+    assert exc.value.code == "ocr_no_chinese_text"
+
+
+def test_extract_chinese_segments_mixed_returns_only_chinese(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.ocr_service.get_ocr_provider",
+        lambda: StubProvider(
+            [
+                RawOcrSegment(text="你好世界", language="zh-hans", confidence=0.95),
+                RawOcrSegment(text="Page 1", language="en", confidence=0.90),
+            ]
+        ),
+    )
+
+    segments = asyncio.run(extract_chinese_segments(PNG_1X1_BYTES, "image/png"))
+
+    assert len(segments) == 1
+    assert segments[0].text == "你好世界"
+
+
+def test_extract_chinese_segments_empty_raw_raises_no_text_detected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.ocr_service.get_ocr_provider",
+        lambda: StubProvider([]),
     )
 
     with pytest.raises(OcrServiceError) as exc:
@@ -112,3 +166,18 @@ def test_normalize_language_handles_none_and_empty() -> None:
     assert _normalize_language("") == "und"
     assert _normalize_language("  ") == "und"
     assert _normalize_language("ZH-HANS") == "zh-hans"
+
+
+def test_invalid_low_confidence_threshold_falls_back_to_default(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from app.services.ocr_service import _resolve_low_confidence_threshold
+
+    monkeypatch.setenv("OCR_LOW_CONFIDENCE_THRESHOLD", "not-a-number")
+
+    with caplog.at_level("WARNING"):
+        threshold = _resolve_low_confidence_threshold()
+
+    assert threshold == pytest.approx(0.7)
+    assert "Invalid OCR_LOW_CONFIDENCE_THRESHOLD" in caplog.text

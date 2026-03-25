@@ -4,7 +4,11 @@ from unittest.mock import patch
 from helpers import PNG_1X1_BYTES, StubOcrProvider, _request_with_body
 
 from app.adapters.ocr_provider import RawOcrSegment
-from app.adapters.pinyin_provider import PinyinProviderUnavailableError, RawPinyinSegment
+from app.adapters.pinyin_provider import (
+    PinyinExecutionError,
+    PinyinProviderUnavailableError,
+    RawPinyinSegment,
+)
 from app.api.v1.process import process_image
 from app.services.image_validation import MAX_FILE_SIZE_BYTES
 
@@ -73,19 +77,18 @@ def test_process_route_valid_upload_returns_success_with_ocr_and_pinyin() -> Non
     assert response.data.ocr.segments[0].text == "你好"
     assert response.data.ocr.segments[0].language == "zh"
     assert response.data.ocr.segments[0].confidence == 0.98
-    # Pinyin present
+    # Pinyin present — one segment per OCR segment with aligned status
     assert response.data.pinyin is not None
-    assert len(response.data.pinyin.segments) == 2
-    assert response.data.pinyin.segments[0].hanzi == "你"
-    assert response.data.pinyin.segments[0].pinyin == "nǐ"
-    assert response.data.pinyin.segments[1].hanzi == "好"
-    assert response.data.pinyin.segments[1].pinyin == "hǎo"
+    assert len(response.data.pinyin.segments) == 1
+    assert response.data.pinyin.segments[0].source_text == "你好"
+    assert response.data.pinyin.segments[0].pinyin_text == "nǐ hǎo"
+    assert response.data.pinyin.segments[0].alignment_status == "aligned"
 
 
 def test_process_route_ocr_no_text_returns_typed_ocr_error() -> None:
     with patch(
         "app.services.ocr_service.get_ocr_provider",
-        return_value=StubOcrProvider([RawOcrSegment(text="hello", language="en", confidence=0.7)]),
+        return_value=StubOcrProvider([]),
     ):
         request = _request_with_body(PNG_1X1_BYTES, "image/png")
         response = asyncio.run(process_image(request))
@@ -94,6 +97,25 @@ def test_process_route_ocr_no_text_returns_typed_ocr_error() -> None:
     assert response.error is not None
     assert response.error.category == "ocr"
     assert response.error.code == "ocr_no_text_detected"
+
+
+def test_process_route_non_chinese_only_returns_ocr_no_chinese_text_error() -> None:
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [
+                RawOcrSegment(text="Hello World", language="en", confidence=0.9),
+                RawOcrSegment(text="Page 12", language="en", confidence=0.85),
+            ]
+        ),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "error"
+    assert response.error is not None
+    assert response.error.category == "ocr"
+    assert response.error.code == "ocr_no_chinese_text"
 
 
 def test_process_route_pinyin_failure_returns_typed_pinyin_error() -> None:
@@ -109,10 +131,42 @@ def test_process_route_pinyin_failure_returns_typed_pinyin_error() -> None:
         request = _request_with_body(PNG_1X1_BYTES, "image/png")
         response = asyncio.run(process_image(request))
 
-    assert response.status == "error"
-    assert response.error is not None
-    assert response.error.category == "pinyin"
-    assert response.error.code == "pinyin_provider_unavailable"
+    assert response.status == "partial"
+    assert response.error is None
+    assert response.data is not None
+    assert response.data.ocr is not None
+    assert len(response.data.ocr.segments) == 1
+    assert response.warnings is not None
+    assert len(response.warnings) == 1
+    assert response.warnings[0].category == "pinyin"
+    assert response.warnings[0].code == "pinyin_provider_unavailable"
+
+
+def test_process_route_pinyin_failure_partial_preserves_ocr() -> None:
+    """When OCR succeeds but pinyin fails, partial response includes OCR data and no pinyin."""
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.95)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=FailingPinyinProvider(),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "partial"
+    # OCR data preserved
+    assert response.data is not None
+    assert response.data.ocr is not None
+    assert response.data.ocr.segments[0].text == "你好"
+    # No pinyin in partial result
+    assert response.data.pinyin is None
+    # Warning carries the failure details
+    assert response.warnings[0].category == "pinyin"
+    assert isinstance(response.warnings[0].message, str)
+    assert response.warnings[0].message
 
 
 def test_process_route_missing_file_returns_validation_error() -> None:
@@ -133,3 +187,91 @@ def test_process_route_enforces_size_limit_without_content_length_header() -> No
     assert response.error is not None
     assert response.error.category == "validation"
     assert response.error.code == "file_too_large"
+
+
+def test_process_route_low_confidence_ocr_returns_partial_with_guidance() -> None:
+    """Low-confidence OCR segments with successful pinyin returns partial with guidance warning."""
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.45)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider([
+            RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+            RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+        ]),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "partial"
+    assert response.error is None
+    assert response.warnings is not None
+    assert len(response.warnings) == 1
+    assert response.warnings[0].category == "ocr"
+    assert response.warnings[0].code == "ocr_low_confidence"
+
+
+def test_process_route_low_confidence_includes_both_ocr_and_pinyin_data() -> None:
+    """Low-confidence partial response preserves both OCR and pinyin."""
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.45)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider([
+            RawPinyinSegment(hanzi="你", pinyin="nǐ"),
+            RawPinyinSegment(hanzi="好", pinyin="hǎo"),
+        ]),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.data is not None
+    assert response.data.ocr is not None
+    assert response.data.ocr.segments[0].text == "你好"
+    # pinyin IS present in low-confidence partial (unlike story 2-3 pinyin-failure partial)
+    assert response.data.pinyin is not None
+    assert len(response.data.pinyin.segments) == 1
+    assert response.data.pinyin.segments[0].source_text == "你好"
+
+
+def test_process_route_mixed_segments_returns_aligned_and_uncertain() -> None:
+    """Multiple OCR segments where one fails alignment → status=success with mixed segments."""
+    call_count = 0
+
+    class MixedProvider:
+        def generate(self, *, text: str) -> list[RawPinyinSegment]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise PinyinExecutionError("malformed output")
+            return [RawPinyinSegment(hanzi=c, pinyin="nǐ") for c in text]
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [
+                RawOcrSegment(text="你好", language="zh", confidence=0.95),
+                RawOcrSegment(text="世界", language="zh", confidence=0.90),
+            ]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=MixedProvider(),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "success"
+    assert response.data is not None
+    assert response.data.pinyin is not None
+    assert len(response.data.pinyin.segments) == 2
+    assert response.data.pinyin.segments[0].alignment_status == "aligned"
+    assert response.data.pinyin.segments[1].alignment_status == "uncertain"
+    assert response.data.pinyin.segments[1].reason_code == "pinyin_execution_failed"
+    assert response.data.pinyin.segments[1].source_text == "世界"
