@@ -25,7 +25,7 @@ jobs:
         run: python -m pip install uv
 
       - name: Sync backend dependencies
-        run: cd backend && uv sync --dev
+        run: cd backend && uv sync --frozen --dev
 
       - name: Ruff
         run: cd backend && uv run ruff check app tests
@@ -52,6 +52,9 @@ jobs:
       - name: ESLint
         run: npm run lint --prefix frontend
 
+      - name: Build
+        run: npm run build --prefix frontend
+
       - name: Vitest
         run: npm run test --prefix frontend
 
@@ -70,7 +73,7 @@ jobs:
         run: python -m pip install uv
 
       - name: Sync backend dependencies
-        run: cd backend && uv sync --dev
+        run: cd backend && uv sync --frozen --dev
 
       - name: Contract tests
         run: cd backend && uv run pytest tests/contract/response_envelopes -q

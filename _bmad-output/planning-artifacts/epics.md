@@ -151,6 +151,7 @@ Improve output trust by handling mixed content, uncertainty, partial results, an
 Enable debugging and runtime visibility with collapsible diagnostics, trace/timing data, and ops endpoints.
 **Depends on:** Epic 1 (request flow foundation), Epic 2 (quality/recovery signal sources)
 **FRs covered:** FR4, FR21, FR22, FR23, FR24, FR25, FR26, FR27, FR28
+**Added:** Story 3.6 (CI build and lockfile checks) — cross-cutting quality gate improvement
 
 ### Epic 4: Cost Guardrails & Safe Usage Control
 Keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
@@ -196,7 +197,8 @@ So that regressions are caught before feature expansion and implementation stays
 **Given** the repository includes backend and frontend apps
 **When** CI runs on pull requests and main branch updates
 **Then** backend lint/test checks execute (Ruff and backend tests)
-**And** frontend lint/test checks execute (ESLint and frontend tests).
+**And** frontend lint/test checks execute (ESLint, Vite production build, and frontend tests)
+**And** backend dependency lockfile is verified in sync (`uv.lock` matches `pyproject.toml`).
 
 **Given** API response envelope conventions are defined
 **When** contract checks run in CI
@@ -482,6 +484,28 @@ So that the project runs on its chosen hosted platform with a repeatable product
 **When** I open the production app
 **Then** the frontend can call the backend successfully over HTTPS
 **And** health checks and basic rollback/redeploy steps are documented.
+
+### Story 3.6: Strengthen CI Build and Lock File Checks
+
+As Clint,
+I want the CI pipeline to verify the frontend production build and enforce lockfile integrity on the backend,
+So that broken builds and dependency drift are caught before merge rather than at deploy time.
+
+**Acceptance Criteria:**
+
+**Given** the frontend has JavaScript/JSX source files
+**When** CI runs the frontend-checks job
+**Then** `vite build` executes after ESLint
+**And** CI fails if the production bundle cannot be generated.
+
+**Given** backend dependencies are declared in pyproject.toml
+**When** CI runs any job that installs backend dependencies
+**Then** `uv sync --frozen` is used instead of plain `uv sync`
+**And** CI fails if `uv.lock` is out of sync with `pyproject.toml`.
+
+**Given** any required quality check fails
+**When** CI completes
+**Then** the pipeline status is failed and merge is blocked.
 
 ## Epic 4: Cost Guardrails & Safe Usage Control
 

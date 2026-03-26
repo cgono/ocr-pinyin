@@ -65,6 +65,7 @@ development_status:
   3-3-add-health-and-metrics-endpoints: done
   3-4-integrate-sentry-error-and-performance-monitoring: done
   3-5-deploy-frontend-and-backend-to-render: done
+  3-6-strengthen-ci-build-and-lock-file-checks: done  # no story file — implemented inline via sprint-change-proposal-2026-03-27.md; changes live in ci.yml
   epic-3-retrospective: optional
 
   epic-4: backlog
