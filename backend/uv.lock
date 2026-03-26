@@ -974,6 +974,24 @@ wheels = [
 ]
 
 [[package]]
+name = "sentry-sdk"
+version = "2.56.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/de/df/5008954f5466085966468612a7d1638487596ee6d2fd7fb51783a85351bf/sentry_sdk-2.56.0.tar.gz", hash = "sha256:fdab72030b69625665b2eeb9738bdde748ad254e8073085a0ce95382678e8168", size = 426820, upload-time = "2026-03-24T09:56:36.575Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cd/1a/b3a3e9f6520493fed7997af4d2de7965d71549c62f994a8fd15f2ecd519e/sentry_sdk-2.56.0-py2.py3-none-any.whl", hash = "sha256:5afafb744ceb91d22f4cc650c6bd048ac6af5f7412dcc6c59305a2e36f4dbc02", size = 451568, upload-time = "2026-03-24T09:56:34.807Z" },
+]
+
+[package.optional-dependencies]
+fastapi = [
+    { name = "fastapi" },
+]
+
+[[package]]
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1016,6 +1034,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pypinyin" },
     { name = "python-multipart" },
+    { name = "sentry-sdk", extra = ["fastapi"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1036,6 +1055,7 @@ requires-dist = [
     { name = "pydantic", specifier = "==2.11.9" },
     { name = "pypinyin", specifier = "==0.55.0" },
     { name = "python-multipart", specifier = "==0.0.22" },
+    { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.0,<3.0" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.37.0" },
 ]
 

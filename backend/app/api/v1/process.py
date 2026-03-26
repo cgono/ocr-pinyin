@@ -23,6 +23,12 @@ from app.services.image_validation import (
 from app.services.ocr_service import OcrServiceError, extract_chinese_segments, is_low_confidence
 from app.services.pinyin_service import PinyinServiceError, generate_pinyin
 
+try:
+    import sentry_sdk
+except ImportError:  # pragma: no cover
+    # Dependency should be installed, but requests must still work.
+    sentry_sdk = None
+
 router = APIRouter()
 
 
@@ -69,6 +75,19 @@ def _make_diagnostics(
     )
 
 
+def _set_sentry_tag(key: str, value: str) -> None:
+    if sentry_sdk is None:
+        return
+    try:
+        sentry_sdk.set_tag(key, value)
+    except Exception:
+        pass
+
+
+def _set_sentry_request_context(request_id: str) -> None:
+    _set_sentry_tag("request_id", request_id)
+
+
 async def _build_process_response(
     image_bytes: bytes | None,
     content_type: str,
@@ -83,8 +102,8 @@ async def _build_process_response(
     trace_steps: list[TraceStep] = []
 
     if not image_bytes:
-        # TODO: log upload_context and request_id here once Sentry/structured logging
-        # is in place (story 3-4). Upload metadata captured but not yet persisted.
+        _set_sentry_tag("outcome", "error")
+        _set_sentry_tag("error_category", "upload")
         metrics_store.increment("error")
         return ProcessResponse(
             status="error",
@@ -103,7 +122,8 @@ async def _build_process_response(
         trace_steps.append(TraceStep(step="ocr", status="ok"))
     except OcrServiceError as error:
         trace_steps.append(TraceStep(step="ocr", status="failed"))
-        # TODO: log trace_steps and upload_context here (story 3-4)
+        _set_sentry_tag("outcome", "error")
+        _set_sentry_tag("error_category", error.category)
         metrics_store.increment("error")
         return ProcessResponse(
             status="error",
@@ -119,6 +139,7 @@ async def _build_process_response(
     except PinyinServiceError as error:
         pinyin_ms = (time.monotonic() - pinyin_start) * 1000
         trace_steps.append(TraceStep(step="pinyin", status="failed"))
+        _set_sentry_tag("outcome", "partial")
         diagnostics = _make_diagnostics(
             upload_context=upload_context,
             start_time=start_time,
@@ -146,6 +167,7 @@ async def _build_process_response(
 
     if is_low_confidence(segments):
         trace_steps.append(TraceStep(step="confidence_check", status="failed"))
+        _set_sentry_tag("outcome", "partial")
         diagnostics = _make_diagnostics(
             upload_context=upload_context,
             start_time=start_time,
@@ -175,6 +197,7 @@ async def _build_process_response(
         )
 
     trace_steps.append(TraceStep(step="confidence_check", status="ok"))
+    _set_sentry_tag("outcome", "success")
     diagnostics = _make_diagnostics(
         upload_context=upload_context,
         start_time=start_time,
@@ -198,6 +221,8 @@ async def _build_process_response(
 def _build_validation_error_response(
     request_id: str, error: ImageValidationError
 ) -> ProcessResponse:
+    _set_sentry_tag("outcome", "error")
+    _set_sentry_tag("error_category", error.category)
     metrics_store.increment("error")
     return ProcessResponse(
         status="error",
@@ -225,6 +250,7 @@ async def process_image(
 ) -> ProcessResponse:
     start_time = time.monotonic()
     request_id = getattr(request.state, "request_id", None) or str(uuid4())
+    _set_sentry_request_context(request_id)
 
     # Guard: check Content-Length before reading the full body into memory (DoS protection).
     content_length = request.headers.get("content-length")
