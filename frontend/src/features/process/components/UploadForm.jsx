@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 
 import { submitProcessRequest } from '../../../lib/api-client'
+import DiagnosticsPanel from './DiagnosticsPanel'
 
 const recoveryGuidanceByCode = {
   missing_file: 'No photo detected. Tap Take Photo or choose an image to continue.',
@@ -16,10 +17,6 @@ const recoveryGuidanceByCode = {
   pinyin_provider_unavailable: 'Pinyin generation is temporarily unavailable. Tap Submit to retry.',
   pinyin_execution_failed: 'Pinyin generation encountered an error. Tap Submit to retry.',
   ocr_low_confidence: 'OCR confidence is low. Tap Retake Photo for a clearer result.',
-}
-
-function formatConfidence(confidence) {
-  return `${Math.round(confidence * 100)}%`
 }
 
 function statusPanelClass(mutation) {
@@ -213,20 +210,7 @@ export default function UploadForm() {
               </div>
             )}
 
-            {/* Secondary: raw OCR details */}
-            {ocrSegments.length > 0 && (
-              <details className="details-section">
-                <summary>Extracted Text (OCR details)</summary>
-                <ul>
-                  {ocrSegments.map((segment, index) => (
-                    <li key={`${segment.text}-${index}`}>
-                      <span>{segment.text}</span>{' '}
-                      <span>({segment.language}, {formatConfidence(segment.confidence)})</span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
+            <DiagnosticsPanel diagnostics={mutation.data?.diagnostics} ocrSegments={ocrSegments} />
           </div>
         )}
       </div>

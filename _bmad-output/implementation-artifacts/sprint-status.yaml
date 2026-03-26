@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-24"
-last_updated: "2026-03-26"  # updated: story 3-1 done after code review and schema hardening
+last_updated: "2026-03-26"  # updated: story 3-2 done after code review and patch
 project: "test-bmad"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -61,7 +61,7 @@ development_status:
 
   epic-3: in-progress
   3-1-capture-request-metadata-and-structured-diagnostics-payload: done
-  3-2-expose-collapsible-result-page-diagnostics: backlog
+  3-2-expose-collapsible-result-page-diagnostics: done
   3-3-add-health-and-metrics-endpoints: backlog
   3-4-integrate-sentry-error-and-performance-monitoring: backlog
   3-5-deploy-frontend-and-backend-to-render: backlog

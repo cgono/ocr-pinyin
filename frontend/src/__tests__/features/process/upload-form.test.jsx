@@ -221,7 +221,7 @@ describe('UploadForm', () => {
 
     await screen.findByLabelText(/result-view/i)
     // OCR details available in a disclosure widget (secondary)
-    expect(screen.getByText(/extracted text/i)).toBeInTheDocument()
+    expect(screen.getByText(/show details/i)).toBeInTheDocument()
     const detailsEl = document.querySelector('details')
     expect(detailsEl).not.toBeNull()
     expect(within(detailsEl).getByText(/你好/)).toBeInTheDocument()
@@ -487,6 +487,6 @@ describe('UploadForm styling and accessibility', () => {
     // Pinyin content is accessible
     expect(screen.getByLabelText(/pinyin-result/i)).toBeInTheDocument()
     // Details toggle is accessible
-    expect(screen.getByText(/extracted text/i)).toBeInTheDocument()
+    expect(screen.getByText(/show details/i)).toBeInTheDocument()
   })
 })
