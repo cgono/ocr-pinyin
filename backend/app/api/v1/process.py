@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Request, UploadFile
 
+from app.core.metrics import metrics_store
 from app.schemas.diagnostics import (
     DiagnosticsPayload,
     TimingInfo,
@@ -84,6 +85,7 @@ async def _build_process_response(
     if not image_bytes:
         # TODO: log upload_context and request_id here once Sentry/structured logging
         # is in place (story 3-4). Upload metadata captured but not yet persisted.
+        metrics_store.increment("error")
         return ProcessResponse(
             status="error",
             request_id=request_id,
@@ -102,6 +104,7 @@ async def _build_process_response(
     except OcrServiceError as error:
         trace_steps.append(TraceStep(step="ocr", status="failed"))
         # TODO: log trace_steps and upload_context here (story 3-4)
+        metrics_store.increment("error")
         return ProcessResponse(
             status="error",
             request_id=request_id,
@@ -123,6 +126,7 @@ async def _build_process_response(
             pinyin_ms=pinyin_ms,
             trace_steps=trace_steps,
         )
+        metrics_store.increment("partial")
         return ProcessResponse(
             status="partial",
             request_id=request_id,
@@ -149,6 +153,7 @@ async def _build_process_response(
             pinyin_ms=pinyin_ms,
             trace_steps=trace_steps,
         )
+        metrics_store.increment("partial")
         return ProcessResponse(
             status="partial",
             request_id=request_id,
@@ -177,6 +182,7 @@ async def _build_process_response(
         pinyin_ms=pinyin_ms,
         trace_steps=trace_steps,
     )
+    metrics_store.increment("success")
     return ProcessResponse(
         status="success",
         request_id=request_id,
@@ -192,6 +198,7 @@ async def _build_process_response(
 def _build_validation_error_response(
     request_id: str, error: ImageValidationError
 ) -> ProcessResponse:
+    metrics_store.increment("error")
     return ProcessResponse(
         status="error",
         request_id=request_id,
