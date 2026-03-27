@@ -26,7 +26,6 @@ services:
   - type: web
     name: ocr-pinyin-frontend
     runtime: static
-    plan: free
     rootDir: frontend
     buildCommand: npm ci && VITE_APP_VERSION=$(node -p "require('./package.json').version") npm run build
     staticPublishPath: dist
