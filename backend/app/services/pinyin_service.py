@@ -52,6 +52,7 @@ async def generate_pinyin(segments: list[OcrSegment]) -> PinyinData:
                     source_text=text,
                     pinyin_text=pinyin_text,
                     alignment_status="aligned",
+                    line_id=ocr_segment.line_id,
                 )
             )
         except PinyinProviderUnavailableError as exc:
@@ -66,6 +67,7 @@ async def generate_pinyin(segments: list[OcrSegment]) -> PinyinData:
                     pinyin_text="",
                     alignment_status="uncertain",
                     reason_code="pinyin_execution_failed",
+                    line_id=ocr_segment.line_id,
                 )
             )
 

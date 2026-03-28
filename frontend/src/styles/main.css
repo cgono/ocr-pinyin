@@ -252,6 +252,15 @@ body {
   word-break: break-word;
 }
 
+.pinyin-line-group {
+  display: block;
+  margin-bottom: 1em;
+}
+
+.pinyin-line-group:last-child {
+  margin-bottom: 0;
+}
+
 .pinyin-result__content ruby rt {
   font-size: 0.55em;
   color: var(--color-text-secondary);

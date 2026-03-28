@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-24"
-last_updated: "2026-03-28"  # updated: story 4-0 done; epics 1, 2, 3 closed; epic-4 restructured via sprint-change-proposal-2026-03-28; story 4-1 done
+last_updated: "2026-03-28"  # updated: story 4-0 done; epics 1, 2, 3 closed; epic-4 restructured via sprint-change-proposal-2026-03-28; story 4-1 done; story 4-2 done
 project: "test-bmad"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -71,7 +71,7 @@ development_status:
   epic-4: in-progress
   4-0-document-sprint-change-proposal-process: done
   4-1-camera-capture-flow-preview-crop-submit-spinner-startup-ping: done
-  4-2-preserve-text-line-layout-in-ocr-and-pinyin-results: backlog
+  4-2-preserve-text-line-layout-in-ocr-and-pinyin-results: done
   4-3-estimate-per-request-processing-cost: backlog  # renumbered from 4-1 via sprint-change-proposal-2026-03-28
   4-4-track-daily-aggregate-usage-cost: backlog  # renumbered from 4-2
   4-5-enforce-or-warn-on-daily-budget-threshold: backlog  # renumbered from 4-3

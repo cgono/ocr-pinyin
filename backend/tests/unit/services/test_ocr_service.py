@@ -29,7 +29,7 @@ def test_extract_chinese_segments_normalizes_fields(monkeypatch: pytest.MonkeyPa
         "app.services.ocr_service.get_ocr_provider",
         lambda: StubProvider(
             [
-                RawOcrSegment(text=" 你好 ", language="ZH-HANS", confidence=92),
+                RawOcrSegment(text=" 你好 ", language="ZH-HANS", confidence=92, line_id=7),
                 RawOcrSegment(text="hello", language="en", confidence=0.6),
             ]
         ),
@@ -41,6 +41,20 @@ def test_extract_chinese_segments_normalizes_fields(monkeypatch: pytest.MonkeyPa
     assert segments[0].text == "你好"
     assert segments[0].language == "zh-hans"
     assert segments[0].confidence == pytest.approx(0.92)
+    assert segments[0].line_id == 7
+
+
+def test_extract_chinese_segments_preserves_none_line_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.services.ocr_service.get_ocr_provider",
+        lambda: StubProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.9)]
+        ),
+    )
+
+    segments = asyncio.run(extract_chinese_segments(PNG_1X1_BYTES, "image/png"))
+
+    assert segments[0].line_id is None
 
 
 def test_extract_chinese_segments_raises_when_no_usable_text(

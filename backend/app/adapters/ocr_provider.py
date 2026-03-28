@@ -7,6 +7,7 @@ class RawOcrSegment:
     text: str
     language: str | None = None
     confidence: float | int | None = None
+    line_id: int | None = None
 
 
 class OcrProvider(Protocol):

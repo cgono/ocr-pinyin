@@ -36,6 +36,31 @@ function renderPinyinAnnotation(segment) {
   return segment.pinyin_text
 }
 
+function groupSegmentsByLine(segments) {
+  const hasLineIds = segments.some(seg => seg.line_id != null)
+  if (!hasLineIds) return null
+
+  const groups = []
+  let currentLineId
+  let currentGroup = []
+
+  for (const seg of segments) {
+    if (seg.line_id !== currentLineId && currentGroup.length > 0) {
+      groups.push({ line_id: currentLineId, segments: currentGroup })
+      currentGroup = []
+    }
+
+    currentLineId = seg.line_id
+    currentGroup.push(seg)
+  }
+
+  if (currentGroup.length > 0) {
+    groups.push({ line_id: currentLineId, segments: currentGroup })
+  }
+
+  return groups
+}
+
 export default function UploadForm() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
@@ -247,12 +272,32 @@ export default function UploadForm() {
                     <div aria-label="pinyin-result">
                       <h3 className="pinyin-result__title">Pinyin Reading</h3>
                       <div className="pinyin-result__content">
-                        {pinyinSegments.map((seg, index) => (
-                          <ruby key={`${seg.source_text}-${seg.alignment_status}-${index}`}>
-                            {seg.source_text}
-                            <rt>{renderPinyinAnnotation(seg)}</rt>
-                          </ruby>
-                        ))}
+                        {(() => {
+                          const lineGroups = groupSegmentsByLine(pinyinSegments)
+
+                          if (!lineGroups) {
+                            return pinyinSegments.map((seg, index) => (
+                              <ruby key={`${seg.source_text}-${seg.alignment_status}-${index}`}>
+                                {seg.source_text}
+                                <rt>{renderPinyinAnnotation(seg)}</rt>
+                              </ruby>
+                            ))
+                          }
+
+                          return lineGroups.map((group, groupIndex) => (
+                            <div
+                              key={`line-${group.line_id}-${groupIndex}`}
+                              className="pinyin-line-group"
+                            >
+                              {group.segments.map((seg, segmentIndex) => (
+                                <ruby key={`${seg.source_text}-${seg.alignment_status}-${segmentIndex}`}>
+                                  {seg.source_text}
+                                  <rt>{renderPinyinAnnotation(seg)}</rt>
+                                </ruby>
+                              ))}
+                            </div>
+                          ))
+                        })()}
                       </div>
                     </div>
                   )}

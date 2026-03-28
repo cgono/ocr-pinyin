@@ -11,6 +11,7 @@ class OcrSegment(BaseModel):
     text: str
     language: str
     confidence: float = Field(ge=0.0, le=1.0)
+    line_id: int | None = Field(default=None, ge=0)
 
 
 class OcrData(BaseModel):
@@ -22,6 +23,7 @@ class PinyinSegment(BaseModel):
     pinyin_text: str
     alignment_status: Literal["aligned", "uncertain"]
     reason_code: str | None = None
+    line_id: int | None = None
 
 
 class PinyinData(BaseModel):

@@ -18,7 +18,7 @@ const DEFAULT_SUCCESS_RESPONSE = {
         {
           source_text: '你好',
           pinyin_text: 'nǐ hǎo',
-          alignment_status: 'aligned'
+          alignment_status: 'aligned',
         },
       ]
     },
@@ -55,7 +55,7 @@ const LOW_CONFIDENCE_PARTIAL_RESPONSE = {
         {
           source_text: '你好',
           pinyin_text: 'nǐ hǎo',
-          alignment_status: 'aligned'
+          alignment_status: 'aligned',
         }
       ]
     }
@@ -67,6 +67,66 @@ const LOW_CONFIDENCE_PARTIAL_RESPONSE = {
       message: 'OCR confidence is low. Consider retaking the photo for better results.'
     }
   ]
+}
+
+const MULTI_LINE_SUCCESS_RESPONSE = {
+  status: 'success',
+  request_id: 'req_multiline',
+  data: {
+    ocr: {
+      segments: [
+        { text: '老师叫', language: 'zh', confidence: 0.95, line_id: 0 },
+        { text: '同学们好', language: 'zh', confidence: 0.94, line_id: 1 },
+      ]
+    },
+    pinyin: {
+      segments: [
+        {
+          source_text: '老师叫',
+          pinyin_text: 'lǎo shī jiào',
+          alignment_status: 'aligned',
+          line_id: 0
+        },
+        {
+          source_text: '同学们好',
+          pinyin_text: 'tóng xué men hǎo',
+          alignment_status: 'aligned',
+          line_id: 1
+        },
+      ]
+    },
+    job_id: null
+  }
+}
+
+const NULL_LINE_ID_SUCCESS_RESPONSE = {
+  status: 'success',
+  request_id: 'req_null_line_id',
+  data: {
+    ocr: {
+      segments: [
+        { text: '老师叫', language: 'zh', confidence: 0.95, line_id: null },
+        { text: '同学们好', language: 'zh', confidence: 0.94, line_id: null },
+      ]
+    },
+    pinyin: {
+      segments: [
+        {
+          source_text: '老师叫',
+          pinyin_text: 'lǎo shī jiào',
+          alignment_status: 'aligned',
+          line_id: null
+        },
+        {
+          source_text: '同学们好',
+          pinyin_text: 'tóng xué men hǎo',
+          alignment_status: 'aligned',
+          line_id: null
+        },
+      ]
+    },
+    job_id: null
+  }
 }
 
 vi.mock('../../../lib/api-client', () => ({
@@ -168,6 +228,44 @@ describe('UploadForm', () => {
     expect(screen.getByText('Pinyin Reading')).toBeInTheDocument()
     expect(within(pinyinResult).getByText('你好')).toBeInTheDocument()
     expect(within(pinyinResult).getByText('nǐ hǎo')).toBeInTheDocument()
+  })
+
+  it('renders multiline pinyin segments in separate line groups when line ids are present', async () => {
+    submitProcessRequest.mockResolvedValueOnce(MULTI_LINE_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    const { container } = renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await screen.findByLabelText(/pinyin-result/i)
+
+    const lineGroups = container.querySelectorAll('.pinyin-line-group')
+    expect(lineGroups).toHaveLength(2)
+    expect(within(lineGroups[0]).getByText('老师叫')).toBeInTheDocument()
+    expect(within(lineGroups[1]).getByText('同学们好')).toBeInTheDocument()
+  })
+
+  it('falls back to flat pinyin rendering when all line ids are null', async () => {
+    submitProcessRequest.mockResolvedValueOnce(NULL_LINE_ID_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    const { container } = renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    const pinyinResult = await screen.findByLabelText(/pinyin-result/i)
+
+    expect(container.querySelectorAll('.pinyin-line-group')).toHaveLength(0)
+    expect(within(pinyinResult).getByText('老师叫')).toBeInTheDocument()
+    expect(within(pinyinResult).getByText('同学们好')).toBeInTheDocument()
+    expect(container.querySelectorAll('ruby')).toHaveLength(2)
   })
 
   it('shows uncertain segments explicitly when alignment fails for one segment', async () => {
