@@ -122,6 +122,7 @@ async def _build_process_response(
             ),
         )
 
+    budget_service.record_request_cost(cost_estimate)
     ocr_start = time.monotonic()
     try:
         segments = await extract_chinese_segments(image_bytes, content_type)
