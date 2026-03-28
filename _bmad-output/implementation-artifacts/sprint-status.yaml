@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-24"
-last_updated: "2026-03-28"  # updated: story 4-0 done; epics 1, 2, 3 closed; epic-4 restructured via sprint-change-proposal-2026-03-28; story 4-1 done; story 4-2 done; story 4-3 done; story 4-4 done; story 4-5 done; story 4-6 done
+last_updated: "2026-03-29"  # updated: story 4-0 done; epics 1, 2, 3 closed; epic-4 restructured via sprint-change-proposal-2026-03-28; story 4-1 done; story 4-2 done; story 4-3 done; story 4-4 done; story 4-5 done; story 4-6 done; staging environment added via sprint-change-proposal-2026-03-29 (render.yaml, ci.yml, docs/deployment.md)
 project: "test-bmad"
 project_key: "NOKEY"
 tracking_system: "file-system"
