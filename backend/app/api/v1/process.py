@@ -1,3 +1,4 @@
+import logging
 import time
 from io import BytesIO
 from uuid import uuid4
@@ -18,8 +19,8 @@ from app.services import budget_service
 from app.services.diagnostics_service import build_diagnostics
 from app.services.image_validation import (
     ALLOWED_IMAGE_MIME_TYPES,
-    MAX_FILE_SIZE_BYTES,
     ImageValidationError,
+    get_configured_max_upload_bytes,
     validate_image_upload,
 )
 from app.services.ocr_service import OcrServiceError, extract_chinese_segments, is_low_confidence
@@ -32,6 +33,7 @@ except ImportError:  # pragma: no cover
     sentry_sdk = None
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _binary_openapi_content() -> dict[str, dict[str, dict[str, str]]]:
@@ -262,12 +264,13 @@ async def process_image(
     start_time = time.monotonic()
     request_id = getattr(request.state, "request_id", None) or str(uuid4())
     _set_sentry_request_context(request_id)
+    max_bytes = get_configured_max_upload_bytes()
 
     # Guard: check Content-Length before reading the full body into memory (DoS protection).
     content_length = request.headers.get("content-length")
     if content_length is not None:
         try:
-            if int(content_length) > MAX_FILE_SIZE_BYTES:
+            if int(content_length) > max_bytes:
                 return _build_validation_error_response(
                     request_id=request_id,
                     error=ImageValidationError(
@@ -281,7 +284,7 @@ async def process_image(
     try:
         file_bytes = await _read_request_body_with_limit(
             request,
-            max_bytes=MAX_FILE_SIZE_BYTES,
+            max_bytes=max_bytes,
         )
     except ImageValidationError as error:
         return _build_validation_error_response(request_id=request_id, error=error)
@@ -299,6 +302,12 @@ async def process_image(
         validate_image_upload(file)
     except ImageValidationError as error:
         return _build_validation_error_response(request_id=request_id, error=error)
+
+    logger.info(
+        "input_guardrail_pass file_size_bytes=%d content_type=%s",
+        len(file_bytes),
+        content_type,
+    )
 
     budget_threshold = budget_service.check_budget_threshold()
     enforce_mode = budget_service.get_budget_enforce_mode()

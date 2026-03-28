@@ -1,4 +1,5 @@
 import io
+import os
 
 from fastapi import UploadFile
 from PIL import Image, UnidentifiedImageError
@@ -32,6 +33,28 @@ class ImageValidationError(Exception):
         self.category = category
 
 
+def get_configured_max_upload_bytes() -> int:
+    """Return the effective file-size ceiling, preferring MAX_UPLOAD_BYTES env var."""
+    try:
+        value = int(os.environ.get("MAX_UPLOAD_BYTES", ""))
+        if value > 0:
+            return value
+    except (ValueError, TypeError):
+        pass
+    return MAX_FILE_SIZE_BYTES
+
+
+def get_configured_max_image_pixels() -> int:
+    """Return the effective pixel-count ceiling, preferring MAX_UPLOAD_PIXELS env var."""
+    try:
+        value = int(os.environ.get("MAX_UPLOAD_PIXELS", ""))
+        if value > 0:
+            return value
+    except (ValueError, TypeError):
+        pass
+    return MAX_IMAGE_PIXELS
+
+
 def validate_image_upload(file: UploadFile | None) -> ValidatedImage:
     if file is None:
         raise ImageValidationError(
@@ -49,7 +72,7 @@ def validate_image_upload(file: UploadFile | None) -> ValidatedImage:
     file.file.seek(0, 2)
     size_bytes = file.file.tell()
     file.file.seek(0)
-    if size_bytes > MAX_FILE_SIZE_BYTES:
+    if size_bytes > get_configured_max_upload_bytes():
         raise ImageValidationError(
             code="file_too_large",
             message="Image is too large. Please upload a smaller file and try again.",
@@ -66,7 +89,7 @@ def validate_image_upload(file: UploadFile | None) -> ValidatedImage:
     try:
         with Image.open(io.BytesIO(image_bytes)) as img:
             width, height = img.size  # Header-only: no pixel decode yet.
-            if width * height <= MAX_IMAGE_PIXELS:
+            if width * height <= get_configured_max_image_pixels():
                 img.load()  # Full decode only within safe bounds; validates integrity.
     except (UnidentifiedImageError, OSError, ValueError, SyntaxError):
         raise ImageValidationError(
@@ -74,7 +97,7 @@ def validate_image_upload(file: UploadFile | None) -> ValidatedImage:
             message="The uploaded file could not be read as an image. Please retake the photo.",
         ) from None
 
-    if width * height > MAX_IMAGE_PIXELS:
+    if width * height > get_configured_max_image_pixels():
         raise ImageValidationError(
             code="image_too_large_pixels",
             message="Image dimensions are too large. Please capture a lower-resolution image.",
@@ -86,5 +109,4 @@ def validate_image_upload(file: UploadFile | None) -> ValidatedImage:
         width=width,
         height=height,
     )
-
 

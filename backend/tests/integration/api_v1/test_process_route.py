@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -234,6 +235,26 @@ def test_process_route_enforces_size_limit_without_content_length_header() -> No
     assert response.error.category == "validation"
     assert response.error.code == "file_too_large"
     assert response.diagnostics is None
+
+
+def test_upload_within_limits_emits_guardrail_log(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.delenv("OCR_PROVIDER", raising=False)
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider([RawOcrSegment(text="你好", language="zh", confidence=0.9)]),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider([RawPinyinSegment(hanzi="你", pinyin="nǐ")]),
+    ), caplog.at_level(logging.INFO, logger="app.api.v1.process"):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "success"
+    assert any("input_guardrail_pass" in record.message for record in caplog.records)
 
 
 def test_process_route_low_confidence_ocr_returns_partial_with_guidance(
