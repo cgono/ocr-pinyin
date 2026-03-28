@@ -1,5 +1,13 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
+export async function getHealthStatus() {
+  try {
+    await fetch(`${API_BASE}/v1/health`)
+  } catch {
+    // intentionally silent warm-up ping
+  }
+}
+
 export async function submitProcessRequest(file) {
   const headers = {}
   if (file?.type) {
