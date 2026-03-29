@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-24"
-last_updated: "2026-03-29"  # updated: story 4-0 done; epics 1, 2, 3 closed; epic-4 restructured via sprint-change-proposal-2026-03-28; story 4-1 done; story 4-2 done; story 4-3 done; story 4-4 done; story 4-5 done; story 4-6 done; staging environment added via sprint-change-proposal-2026-03-29 (render.yaml, ci.yml, docs/deployment.md); story 4-7 added via sprint-change-proposal-2026-03-29-versioning; story 4-7 done
+last_updated: "2026-03-29"  # updated: story 4-0 done; epics 1, 2, 3 closed; epic-4 restructured via sprint-change-proposal-2026-03-28; story 4-1 done; story 4-2 done; story 4-3 done; story 4-4 done; story 4-5 done; story 4-6 done; staging environment added via sprint-change-proposal-2026-03-29 (render.yaml, ci.yml, docs/deployment.md); story 4-7 added via sprint-change-proposal-2026-03-29-versioning; story 4-7 done; epic-4 retrospective done; epic-6 added + prioritized before epic-5 via sprint-change-proposal-2026-03-29-translation-release; release strategy formalized (feature→staging→main)
 project: "test-bmad"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -68,7 +68,7 @@ development_status:
   3-6-strengthen-ci-build-and-lock-file-checks: done  # no story file — implemented inline via sprint-change-proposal-2026-03-27.md; changes live in ci.yml
   epic-3-retrospective: done
 
-  epic-4: in-progress
+  epic-4: done
   4-0-document-sprint-change-proposal-process: done
   4-1-camera-capture-flow-preview-crop-submit-spinner-startup-ping: done
   4-2-preserve-text-line-layout-in-ocr-and-pinyin-results: done
@@ -77,7 +77,12 @@ development_status:
   4-5-enforce-or-warn-on-daily-budget-threshold: done  # renumbered from 4-3
   4-6-restrict-oversized-or-high-cost-inputs: done  # renumbered from 4-4
   4-7-release-please-versioning-and-render-yaml-ci-validation: done  # added via sprint-change-proposal-2026-03-29-versioning
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
+
+  # Epic 6 is worked before Epic 5 — see sprint-change-proposal-2026-03-29-translation-release.md
+  epic-6: backlog
+  6-1-add-english-translation-below-chinese-characters: backlog
+  epic-6-retrospective: optional
 
   epic-5: backlog
   5-1-store-result-artifacts-for-later-retrieval: backlog

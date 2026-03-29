@@ -93,7 +93,7 @@ For this personal project, success is measured by capability transfer:
 ### Growth Features (Post-MVP)
 
 - Audio pronunciation generation for pinyin output.
-- English translation for extracted text.
+- English translation for extracted text — **planned (Epic 6, Story 6.1)**.
 - Quality enhancements for harder images/pages (lighting, skew, layout variation).
 
 ### Vision (Future)
@@ -317,6 +317,10 @@ Mitigation: single public processing endpoint, minimal auth, no SDK, strict MVP 
 - FR34: User can retrieve a specific historical result by identifier.
 - FR35: System can store result artifacts required for later review.
 - FR36: System can support future extension to saved-book compilation workflows.
+
+### Translation & Pronunciation
+
+- FR42: System can return English translation for extracted Chinese text segments.
 
 ### API Lifecycle & Access Model
 

@@ -163,10 +163,17 @@ Refine the capture-to-result experience based on live MVP testing, and keep the 
 **FRs covered:** FR12, FR14, FR15, FR29, FR30, FR31, FR32
 **Added:** Stories 4.1 and 4.2 (UX polish from live MVP testing — camera capture flow and line layout preservation)
 
+### Epic 6: Translation & Pronunciation Output
+Add English translation for extracted Chinese text, with architecture extensibility for future audio pronunciation output.
+**Depends on:** Epic 2 (segment alignment), Epic 4 (line_id layout)
+**FRs covered:** FR42
+**Sprint priority:** Worked before Epic 5 — added via sprint-change-proposal-2026-03-29-translation-release.md
+
 ### Epic 5: History, Reuse & Future Evolution
 Allow session/history recall and maintain a clean path to future saved-book workflows and auth evolution.
 **Depends on:** Epic 1 (core request/response and IDs), Epic 3 (diagnostics payload conventions)
 **FRs covered:** FR33, FR34, FR35, FR36, FR38, FR40
+**Sprint priority:** Follows Epic 6 — see sprint-change-proposal-2026-03-29-translation-release.md
 
 ## Epic 1: Foundation & Capture-to-Result Vertical Slice
 
@@ -762,6 +769,53 @@ So that I never manually bump versions or publish releases, and a malformed rend
 **Then** all existing jobs continue to pass unaffected
 
 **Note:** Added via sprint-change-proposal-2026-03-29-versioning.md
+
+## Epic 6: Translation & Pronunciation Output
+
+Add English translation for extracted Chinese text, with architecture extensibility for future audio pronunciation output.
+**Depends on:** Epic 2 (segment alignment), Epic 4 (line_id layout)
+
+### Story 6.1: Add English Translation Below Chinese Characters
+
+As Clint,
+I want an English translation displayed below each line of Chinese characters in the result,
+So that I can understand the meaning without switching to another app.
+
+**Display format per line group:**
+```
+lǎo shī jiào        ← pinyin (existing)
+老师叫               ← characters (existing)
+Teacher calls out   ← translation (new, smaller/muted style)
+```
+
+**Acceptance Criteria:**
+
+**Given** a successful OCR + pinyin result
+**When** TRANSLATION_ENABLED=true
+**Then** each PinyinSegment in the API response includes translation_text (non-null string)
+**And** the frontend renders translation_text below the character row in smaller, muted styling.
+
+**Given** TRANSLATION_ENABLED=false or the translation call fails
+**When** the result is returned
+**Then** translation_text is null
+**And** the existing display is unchanged with no regression.
+
+**Given** all existing backend and frontend tests run
+**When** the schema change is applied
+**Then** all existing tests continue to pass.
+
+**Schema change:**
+```
+OLD PinyinSegment: { source_text, pinyin_text, alignment_status, reason_code, line_id }
+NEW PinyinSegment: { source_text, pinyin_text, alignment_status, reason_code, line_id, translation_text }
+```
+
+`translation_text` is `null` when `TRANSLATION_ENABLED=false` or translation unavailable.
+Translation is per line group (one translation per `line_id` group, not per character).
+
+**Note:** Added via sprint-change-proposal-2026-03-29-translation-release.md
+
+---
 
 ## Epic 5: History, Reuse & Future Evolution
 
