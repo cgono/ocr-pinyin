@@ -6,7 +6,6 @@ requires-python = ">=3.12"
 dependencies = [
   "google-cloud-vision>=3.7,<4.0",
   "fastapi==0.129.0",
-  "langchain-core==0.3.81",
   "pillow==12.1.1",
   "pydantic==2.11.9",
   "pypinyin==0.55.0",

@@ -99,12 +99,12 @@ def test_extract_raises_ocr_execution_error_on_unexpected_exception() -> None:
         provider.extract(image_bytes=b"bad-image", content_type="image/png")
 
 
-def test_langchain_chain_invoked_with_full_response() -> None:
-    """Verify the provider passes the full Textract response dict (not just Blocks) to the chain."""
+def test_extract_passes_full_response_dict_to_pipeline() -> None:
+    """Verify the provider passes the full Textract response dict to the pipeline."""
     provider = _make_provider(_TEXTRACT_TWO_LINE_RESPONSE)
 
-    with patch("app.adapters.textract_ocr_provider._extraction_chain") as mock_chain:
-        mock_chain.invoke.return_value = []
+    with patch("app.adapters.textract_ocr_provider._textract_response_to_documents") as mock_step:
+        mock_step.return_value = []
         provider.extract(image_bytes=b"fake", content_type="image/png")
 
-    mock_chain.invoke.assert_called_once_with(_TEXTRACT_TWO_LINE_RESPONSE)
+    mock_step.assert_called_once_with(_TEXTRACT_TWO_LINE_RESPONSE)

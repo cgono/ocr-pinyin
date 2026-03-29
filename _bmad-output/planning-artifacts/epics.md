@@ -44,7 +44,7 @@ FR21: User can view diagnostics in a collapsible section on the result page.
 FR22: System can expose raw OCR output for troubleshooting.
 FR23: System can expose confidence indicators for extracted text.
 FR24: System can expose request timing details for each processing run.
-FR25: System can expose LangChain/tool execution trace data for debugging.
+FR25: System can expose tool execution trace data for debugging.
 FR26: System can emit usage and error telemetry suitable for Sentry error and performance monitoring.
 FR27: System can provide service health status via API endpoint.
 FR28: System can provide operational metrics via API endpoint.

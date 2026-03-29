@@ -1,13 +1,13 @@
 """Google Cloud Vision OCR provider.
 
-LangChain is used for the extraction chain that transforms the raw GCV API
-response (full_text_annotation) into normalised RawOcrSegment values.  The
-chain is composed of two RunnableLambda steps:
+The extraction pipeline transforms the raw GCV API response
+(full_text_annotation) into normalised RawOcrSegment values via two composed
+pure functions:
 
   1. _gcv_response_to_documents – iterates TEXT blocks at paragraph granularity,
-     extracts text by joining symbols, and wraps each paragraph in a LangChain
-     Document carrying confidence and language metadata.
-  2. _documents_to_segments – maps LangChain Documents to the adapter's
+     extracts text by joining symbols, and wraps each paragraph in an _OcrDoc
+     carrying confidence and language metadata.
+  2. _documents_to_segments – maps _OcrDoc values to the adapter's
      RawOcrSegment dataclass.
 
 Environment variables
@@ -19,6 +19,7 @@ GOOGLE_CLOUD_PROJECT                   Optional; only needed if not encoded in t
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import os
@@ -26,12 +27,18 @@ import os
 import google.api_core.exceptions
 from google.cloud import vision
 from google.oauth2 import service_account
-from langchain_core.documents import Document
-from langchain_core.runnables import RunnableLambda
 
 from app.adapters.ocr_provider import OcrExecutionError, ProviderUnavailableError, RawOcrSegment
 
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class _OcrDoc:
+    """Intermediate container for a single OCR paragraph before segment conversion."""
+
+    page_content: str
+    metadata: dict
 
 
 def _paragraph_text(paragraph) -> str:
@@ -42,8 +49,8 @@ def _paragraph_text(paragraph) -> str:
     )
 
 
-def _gcv_response_to_documents(response) -> list[Document]:
-    """Iterate TEXT blocks at paragraph granularity and wrap each in a LangChain Document."""
+def _gcv_response_to_documents(response) -> list[_OcrDoc]:
+    """Iterate TEXT blocks at paragraph granularity and wrap each in an _OcrDoc."""
     docs = []
     line_id = 0
     for page in response.full_text_annotation.pages or []:
@@ -57,7 +64,7 @@ def _gcv_response_to_documents(response) -> list[Document]:
                 langs = list(paragraph.property.detected_languages)
                 language = langs[0].language_code if langs else None
                 docs.append(
-                    Document(
+                    _OcrDoc(
                         page_content=text,
                         metadata={
                             "confidence": paragraph.confidence,
@@ -70,8 +77,8 @@ def _gcv_response_to_documents(response) -> list[Document]:
     return docs
 
 
-def _documents_to_segments(docs: list[Document]) -> list[RawOcrSegment]:
-    """Map LangChain Documents to OCR adapter segments."""
+def _documents_to_segments(docs: list[_OcrDoc]) -> list[RawOcrSegment]:
+    """Map _OcrDoc values to OCR adapter segments."""
     return [
         RawOcrSegment(
             text=doc.page_content,
@@ -83,19 +90,12 @@ def _documents_to_segments(docs: list[Document]) -> list[RawOcrSegment]:
     ]
 
 
-# Module-level chain: GCV response → list[RawOcrSegment].
-_extraction_chain = (
-    RunnableLambda(_gcv_response_to_documents)
-    | RunnableLambda(_documents_to_segments)
-)
-
-
 class GoogleCloudVisionOcrProvider:
     """Google Cloud Vision implementation of the OcrProvider protocol.
 
     Reads image bytes via GCV's DOCUMENT_TEXT_DETECTION API, then runs the
-    result through the LangChain extraction chain to produce normalised
-    RawOcrSegment values with per-paragraph language codes (e.g. "zh-Hans").
+    result through the extraction pipeline to produce normalised RawOcrSegment
+    values with per-paragraph language codes (e.g. "zh-Hans").
     """
 
     def __init__(self) -> None:
@@ -150,4 +150,4 @@ class GoogleCloudVisionOcrProvider:
             "GCV first paragraph: %s",
             _paragraph_text(first_paragraph)[:40] if first_paragraph else "(none)",
         )
-        return _extraction_chain.invoke(response)
+        return _documents_to_segments(_gcv_response_to_documents(response))

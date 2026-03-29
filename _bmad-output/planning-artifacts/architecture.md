@@ -38,7 +38,7 @@ The project is product-scope small but architecturally non-trivial due to orches
 
 ### Technical Constraints & Dependencies
 
-The architecture must support LangChain-based orchestration as a core implementation goal and learning objective. It should remain provider-adaptable for OCR and language processing while preserving deterministic response contracts for `/v1`. The system is intentionally constrained to MVP simplicity: one primary public processing endpoint, no SDK requirement, and no initial authentication.
+The OCR adapter layer uses a simple functional pipeline — raw provider responses are transformed to normalised RawOcrSegment values through two composed pure functions, keeping provider-specific logic isolated from the service layer. The architecture should remain provider-adaptable for OCR and language processing while preserving deterministic response contracts for `/v1`. The system is intentionally constrained to MVP simplicity: one primary public processing endpoint, no SDK requirement, and no initial authentication.
 
 Performance, correctness, and cost constraints must be enforceable with measurable signals. The implementation should expose health and metrics endpoints sufficient for direct use and future observability integration. Data handling design should preserve future features (audio, translation, book compilation) without forcing major contract redesign.
 

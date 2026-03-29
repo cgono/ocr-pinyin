@@ -1,18 +1,17 @@
 # LEGACY: Requires boto3. Does not support Chinese script. Use google_vision instead.
 """AWS Textract OCR provider.
 
-LangChain is used for the extraction chain that transforms the raw Textract API
-response (a list of Block dicts) into normalised RawOcrSegment values.  The
-chain is composed of two RunnableLambda steps:
+The extraction pipeline transforms the raw Textract API response (a list of
+Block dicts) into normalised RawOcrSegment values via two composed pure functions:
 
   1. _textract_response_to_documents – keeps only LINE-level blocks and wraps
-     each one in a LangChain Document so later stages can be swapped in without
-     touching the provider interface.
-  2. _documents_to_segments – maps LangChain Documents to the adapter's
-     RawOcrSegment dataclass, carrying text and confidence from Textract.
-     Language is left as None because Textract's DetectDocumentText does not
-     return a language tag; the OCR service layer normalises it to "und" and the
-     CJK filter determines usability.
+     each one in an _OcrDoc so later stages can be swapped in without touching
+     the provider interface.
+  2. _documents_to_segments – maps _OcrDoc values to the adapter's RawOcrSegment
+     dataclass, carrying text and confidence from Textract.  Language is left as
+     None because Textract's DetectDocumentText does not return a language tag;
+     the OCR service layer normalises it to "und" and the CJK filter determines
+     usability.
 
 Environment variables
 ---------------------
@@ -23,25 +22,32 @@ AWS credentials           Standard boto3 resolution (env vars, ~/.aws, IAM role)
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 from typing import Any
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from langchain_core.documents import Document
-from langchain_core.runnables import RunnableLambda
 
 from app.adapters.ocr_provider import OcrExecutionError, ProviderUnavailableError, RawOcrSegment
 
 logger = logging.getLogger(__name__)
 
 
-def _textract_response_to_documents(response: dict[str, Any]) -> list[Document]:
-    """Keep only LINE-level Textract blocks and wrap each in a LangChain Document."""
+@dataclasses.dataclass
+class _OcrDoc:
+    """Intermediate container for a single OCR line before segment conversion."""
+
+    page_content: str
+    metadata: dict
+
+
+def _textract_response_to_documents(response: dict[str, Any]) -> list[_OcrDoc]:
+    """Keep only LINE-level Textract blocks and wrap each in an _OcrDoc."""
     blocks: list[dict[str, Any]] = response.get("Blocks", [])
     return [
-        Document(
+        _OcrDoc(
             page_content=block["Text"],
             metadata={"confidence": block.get("Confidence", 0.0)},
         )
@@ -50,8 +56,8 @@ def _textract_response_to_documents(response: dict[str, Any]) -> list[Document]:
     ]
 
 
-def _documents_to_segments(docs: list[Document]) -> list[RawOcrSegment]:
-    """Map LangChain Documents to OCR adapter segments."""
+def _documents_to_segments(docs: list[_OcrDoc]) -> list[RawOcrSegment]:
+    """Map _OcrDoc values to OCR adapter segments."""
     return [
         RawOcrSegment(
             text=doc.page_content,
@@ -62,19 +68,12 @@ def _documents_to_segments(docs: list[Document]) -> list[RawOcrSegment]:
     ]
 
 
-# Module-level chain: Textract response dict → list[RawOcrSegment].
-_extraction_chain = (
-    RunnableLambda(_textract_response_to_documents)
-    | RunnableLambda(_documents_to_segments)
-)
-
-
 class TextractOcrProvider:
     """AWS Textract implementation of the OcrProvider protocol.
 
     Reads image bytes via Textract's DetectDocumentText API, then runs the
-    result through the LangChain extraction chain to produce normalised
-    RawOcrSegment values.
+    result through the extraction pipeline to produce normalised RawOcrSegment
+    values.
     """
 
     def __init__(self, region_name: str | None = None) -> None:
@@ -87,7 +86,7 @@ class TextractOcrProvider:
             ) from exc
 
     def extract(self, *, image_bytes: bytes, content_type: str) -> list[RawOcrSegment]:
-        """Call Textract and return normalised segments via the LangChain chain."""
+        """Call Textract and return normalised segments via the extraction pipeline."""
         try:
             response = self._client.detect_document_text(Document={"Bytes": image_bytes})
         except (BotoCoreError, ClientError) as exc:
@@ -101,4 +100,4 @@ class TextractOcrProvider:
             len(blocks),
             [(b.get("BlockType"), b.get("Text", "")[:40]) for b in blocks],
         )
-        return _extraction_chain.invoke(response)
+        return _documents_to_segments(_textract_response_to_documents(response))

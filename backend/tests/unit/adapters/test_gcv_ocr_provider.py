@@ -7,11 +7,11 @@ _documents_to_segments) which can be exercised without GCP credentials.
 from types import SimpleNamespace
 
 from google.cloud import vision
-from langchain_core.documents import Document
 
 from app.adapters.google_cloud_vision_ocr_provider import (
     _documents_to_segments,
     _gcv_response_to_documents,
+    _OcrDoc,
 )
 
 
@@ -112,8 +112,8 @@ def test_gcv_response_skips_non_text_blocks() -> None:
 
 def test_documents_to_segments_maps_line_id() -> None:
     docs = [
-        Document(page_content="你好", metadata={"confidence": 0.9, "language": "zh", "line_id": 0}),
-        Document(page_content="世界", metadata={"confidence": 0.8, "language": "zh", "line_id": 1}),
+        _OcrDoc(page_content="你好", metadata={"confidence": 0.9, "language": "zh", "line_id": 0}),
+        _OcrDoc(page_content="世界", metadata={"confidence": 0.8, "language": "zh", "line_id": 1}),
     ]
 
     segments = _documents_to_segments(docs)
@@ -124,7 +124,7 @@ def test_documents_to_segments_maps_line_id() -> None:
 
 def test_documents_to_segments_handles_missing_line_id() -> None:
     docs = [
-        Document(page_content="你好", metadata={"confidence": 0.9, "language": "zh"}),
+        _OcrDoc(page_content="你好", metadata={"confidence": 0.9, "language": "zh"}),
     ]
 
     segments = _documents_to_segments(docs)
