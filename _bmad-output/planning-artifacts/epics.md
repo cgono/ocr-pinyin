@@ -669,6 +669,42 @@ So that I avoid accidental overspend beyond the daily limit.
 **Then** system blocks further expensive processing with structured budget category response
 **And** user receives clear guidance on next steps.
 
+### Story 4.7: Release-Please Versioning + render.yaml CI Validation
+
+As Clint,
+I want frontend and backend versions incremented automatically based on conventional commits with GitHub Releases created on merge, AND I want render.yaml validated in CI,
+So that I never manually bump versions or publish releases, and a malformed render.yaml is caught before it reaches a deploy.
+
+**Acceptance Criteria:**
+
+**Given** conventional commits have been merged to main
+**When** the release-please workflow runs
+**Then** a "release PR" is opened (or updated) with CHANGELOG.md updated, `frontend/package.json` version bumped, and `backend/pyproject.toml` version bumped
+
+**Given** the release PR is merged
+**When** release-please runs post-merge
+**Then** a GitHub Release is created automatically with the version tag and changelog content
+**And** frontend and backend are versioned independently (monorepo)
+
+**Given** `render.yaml` exists in the repo root
+**When** CI runs on pull requests and main/staging branch pushes
+**Then** the Render CLI downloads and runs `render blueprints validate render.yaml`, failing CI if the file fails Render's own schema validation
+**And** the check runs as a new job in the existing CI workflow
+
+**Given** `render.yaml` is valid
+**When** the check runs
+**Then** it passes and does not block merge
+
+**Given** `render.yaml` contains an invalid value or missing required field
+**When** the check runs
+**Then** CI fails with Render's validation error output
+
+**Given** all existing CI checks
+**When** story 4.7 is implemented
+**Then** all existing jobs continue to pass unaffected
+
+**Note:** Added via sprint-change-proposal-2026-03-29-versioning.md
+
 ### Story 4.6: Restrict Oversized or High-Cost Inputs
 
 As Clint,

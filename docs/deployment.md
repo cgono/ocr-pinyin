@@ -105,6 +105,21 @@ In the Sentry dashboard, use the **Environment** dropdown to filter issues and t
 
 ---
 
+## CI Setup
+
+The `render-yaml-check` job in CI validates `render.yaml` using the Render CLI and requires two values to be configured in the GitHub repository:
+
+| Type | Name | Where to find it |
+|------|------|-----------------|
+| Secret | `RENDER_API_KEY` | Render dashboard → Account Settings → API Keys |
+| Variable | `RENDER_WORKSPACE_ID` | Render dashboard → Workspace Settings → General (the ID in the URL) |
+
+Set these under **Settings → Secrets and variables → Actions** in the GitHub repository.
+
+> **Forks:** If you fork this repository and open pull requests, you must configure `RENDER_API_KEY` and `RENDER_WORKSPACE_ID` in your fork's Actions settings for the `render-yaml-check` job to pass.
+
+---
+
 ## Redeploy
 
 Render auto-deploys on every push to the connected branch, typically `main`.

@@ -78,3 +78,26 @@ jobs:
 
       - name: Contract tests
         run: cd backend && uv run pytest tests/contract/response_envelopes -q
+
+  render-yaml-check:
+    runs-on: ubuntu-latest
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_WORKSPACE_ID: ${{ vars.RENDER_WORKSPACE_ID }}
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate required secrets
+        run: |
+          [[ -n "$RENDER_API_KEY" ]] || { echo "ERROR: RENDER_API_KEY secret not configured. See docs/deployment.md for CI setup instructions."; exit 1; }
+          [[ -n "$RENDER_WORKSPACE_ID" ]] || { echo "ERROR: RENDER_WORKSPACE_ID variable not configured. See docs/deployment.md for CI setup instructions."; exit 1; }
+
+      - name: Install Render CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/render-oss/cli/refs/tags/v2.15.0/bin/install.sh | sh
+          echo "$HOME/.render/bin" >> $GITHUB_PATH
+
+      - name: Validate render.yaml
+        run: render blueprints validate render.yaml --workspace "$RENDER_WORKSPACE_ID" --output text --confirm
