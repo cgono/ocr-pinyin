@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.diagnostics import TimingInfo, TraceStep, UploadContext
+from app.schemas.diagnostics import CostEstimate, TimingInfo, TraceStep, UploadContext
 
 # --- TimingInfo: required fields (#12) ---
 
@@ -78,3 +78,43 @@ def test_trace_step_accepts_pinyin() -> None:
 def test_trace_step_accepts_confidence_check() -> None:
     ts = TraceStep(step="confidence_check", status="ok")
     assert ts.step == "confidence_check"
+
+
+def test_cost_estimate_accepts_full_with_numeric_values() -> None:
+    estimate = CostEstimate(
+        estimated_usd=0.0015,
+        estimated_sgd=0.002025,
+        confidence="full",
+    )
+
+    assert estimate.estimated_usd == pytest.approx(0.0015)
+    assert estimate.estimated_sgd == pytest.approx(0.002025)
+    assert estimate.confidence == "full"
+
+
+def test_cost_estimate_accepts_unavailable_without_currency_values() -> None:
+    estimate = CostEstimate(confidence="unavailable")
+
+    assert estimate.estimated_usd is None
+    assert estimate.estimated_sgd is None
+    assert estimate.confidence == "unavailable"
+
+
+def test_cost_estimate_rejects_invalid_confidence() -> None:
+    with pytest.raises(ValidationError):
+        CostEstimate(confidence="estimated")
+
+
+def test_cost_estimate_rejects_full_confidence_without_currency_values() -> None:
+    with pytest.raises(ValidationError):
+        CostEstimate(confidence="full")
+
+
+def test_cost_estimate_rejects_negative_usd() -> None:
+    with pytest.raises(ValidationError):
+        CostEstimate(confidence="full", estimated_usd=-0.001, estimated_sgd=0.002025)
+
+
+def test_cost_estimate_rejects_negative_sgd() -> None:
+    with pytest.raises(ValidationError):
+        CostEstimate(confidence="full", estimated_usd=0.0015, estimated_sgd=-0.001)

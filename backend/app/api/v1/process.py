@@ -1,3 +1,4 @@
+import logging
 import time
 from io import BytesIO
 from uuid import uuid4
@@ -6,6 +7,7 @@ from fastapi import APIRouter, Request, UploadFile
 
 from app.core.metrics import metrics_store
 from app.schemas.diagnostics import (
+    CostEstimate,
     DiagnosticsPayload,
     TimingInfo,
     TraceInfo,
@@ -13,11 +15,12 @@ from app.schemas.diagnostics import (
     UploadContext,
 )
 from app.schemas.process import OcrData, ProcessData, ProcessError, ProcessResponse, ProcessWarning
+from app.services import budget_service
 from app.services.diagnostics_service import build_diagnostics
 from app.services.image_validation import (
     ALLOWED_IMAGE_MIME_TYPES,
-    MAX_FILE_SIZE_BYTES,
     ImageValidationError,
+    get_configured_max_upload_bytes,
     validate_image_upload,
 )
 from app.services.ocr_service import OcrServiceError, extract_chinese_segments, is_low_confidence
@@ -30,6 +33,7 @@ except ImportError:  # pragma: no cover
     sentry_sdk = None
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _binary_openapi_content() -> dict[str, dict[str, dict[str, str]]]:
@@ -63,6 +67,7 @@ def _make_diagnostics(
     ocr_ms: float,
     pinyin_ms: float,
     trace_steps: list[TraceStep],
+    cost_estimate: CostEstimate | None,
 ) -> DiagnosticsPayload:
     return build_diagnostics(
         upload_context=upload_context,
@@ -72,6 +77,7 @@ def _make_diagnostics(
             pinyin_ms=pinyin_ms,
         ),
         trace=TraceInfo(steps=trace_steps),
+        cost_estimate=cost_estimate,
     )
 
 
@@ -99,6 +105,9 @@ async def _build_process_response(
         content_type=content_type,
         file_size_bytes=len(image_bytes) if image_bytes else 0,
     )
+    cost_estimate = budget_service.estimate_request_cost(
+        file_size_bytes=upload_context.file_size_bytes
+    )
     trace_steps: list[TraceStep] = []
 
     if not image_bytes:
@@ -115,6 +124,7 @@ async def _build_process_response(
             ),
         )
 
+    budget_service.record_request_cost(cost_estimate)
     ocr_start = time.monotonic()
     try:
         segments = await extract_chinese_segments(image_bytes, content_type)
@@ -146,6 +156,7 @@ async def _build_process_response(
             ocr_ms=ocr_ms,
             pinyin_ms=pinyin_ms,
             trace_steps=trace_steps,
+            cost_estimate=cost_estimate,
         )
         metrics_store.increment("partial")
         return ProcessResponse(
@@ -174,6 +185,7 @@ async def _build_process_response(
             ocr_ms=ocr_ms,
             pinyin_ms=pinyin_ms,
             trace_steps=trace_steps,
+            cost_estimate=cost_estimate,
         )
         metrics_store.increment("partial")
         return ProcessResponse(
@@ -204,6 +216,7 @@ async def _build_process_response(
         ocr_ms=ocr_ms,
         pinyin_ms=pinyin_ms,
         trace_steps=trace_steps,
+        cost_estimate=cost_estimate,
     )
     metrics_store.increment("success")
     return ProcessResponse(
@@ -251,12 +264,13 @@ async def process_image(
     start_time = time.monotonic()
     request_id = getattr(request.state, "request_id", None) or str(uuid4())
     _set_sentry_request_context(request_id)
+    max_bytes = get_configured_max_upload_bytes()
 
     # Guard: check Content-Length before reading the full body into memory (DoS protection).
     content_length = request.headers.get("content-length")
     if content_length is not None:
         try:
-            if int(content_length) > MAX_FILE_SIZE_BYTES:
+            if int(content_length) > max_bytes:
                 return _build_validation_error_response(
                     request_id=request_id,
                     error=ImageValidationError(
@@ -270,7 +284,7 @@ async def process_image(
     try:
         file_bytes = await _read_request_body_with_limit(
             request,
-            max_bytes=MAX_FILE_SIZE_BYTES,
+            max_bytes=max_bytes,
         )
     except ImageValidationError as error:
         return _build_validation_error_response(request_id=request_id, error=error)
@@ -289,9 +303,59 @@ async def process_image(
     except ImageValidationError as error:
         return _build_validation_error_response(request_id=request_id, error=error)
 
-    return await _build_process_response(
+    logger.info(
+        "input_guardrail_pass file_size_bytes=%d content_type=%s",
+        len(file_bytes),
+        content_type,
+    )
+
+    budget_threshold = budget_service.check_budget_threshold()
+    enforce_mode = budget_service.get_budget_enforce_mode()
+
+    if budget_threshold == "exceeded" and enforce_mode == "block":
+        _set_sentry_tag("outcome", "error")
+        _set_sentry_tag("error_category", "budget")
+        metrics_store.increment("error")
+        return ProcessResponse(
+            status="error",
+            request_id=request_id,
+            error=ProcessError(
+                category="budget",
+                code="budget_daily_limit_exceeded",
+                message="Daily processing budget has been reached. Please try again tomorrow.",
+            ),
+        )
+
+    budget_warn: ProcessWarning | None = None
+    if budget_threshold in ("warn", "exceeded"):
+        budget_warn = ProcessWarning(
+            category="budget",
+            code=(
+                "budget_daily_limit_reached"
+                if budget_threshold == "exceeded"
+                else "budget_approaching_daily_limit"
+            ),
+            message=(
+                "Daily processing budget has been reached. Results may be limited soon."
+                if budget_threshold == "exceeded"
+                else "Daily processing budget is nearly reached."
+            ),
+        )
+
+    response = await _build_process_response(
         file_bytes,
         content_type,
         request_id=request_id,
         start_time=start_time,
     )
+
+    if budget_warn is not None and response.status != "error":
+        return ProcessResponse(
+            status="partial",
+            request_id=response.request_id,
+            data=response.data,
+            warnings=(response.warnings or []) + [budget_warn],
+            diagnostics=response.diagnostics,
+        )
+
+    return response

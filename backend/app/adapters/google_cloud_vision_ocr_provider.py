@@ -45,6 +45,7 @@ def _paragraph_text(paragraph) -> str:
 def _gcv_response_to_documents(response) -> list[Document]:
     """Iterate TEXT blocks at paragraph granularity and wrap each in a LangChain Document."""
     docs = []
+    line_id = 0
     for page in response.full_text_annotation.pages or []:
         for block in page.blocks:
             if block.block_type != vision.Block.BlockType.TEXT:
@@ -58,9 +59,14 @@ def _gcv_response_to_documents(response) -> list[Document]:
                 docs.append(
                     Document(
                         page_content=text,
-                        metadata={"confidence": paragraph.confidence, "language": language},
+                        metadata={
+                            "confidence": paragraph.confidence,
+                            "language": language,
+                            "line_id": line_id,
+                        },
                     )
                 )
+                line_id += 1
     return docs
 
 
@@ -71,6 +77,7 @@ def _documents_to_segments(docs: list[Document]) -> list[RawOcrSegment]:
             text=doc.page_content,
             language=doc.metadata.get("language"),
             confidence=doc.metadata["confidence"],
+            line_id=doc.metadata.get("line_id"),
         )
         for doc in docs
     ]

@@ -1,3 +1,4 @@
+import React from 'react'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -17,7 +18,7 @@ const DEFAULT_SUCCESS_RESPONSE = {
         {
           source_text: '你好',
           pinyin_text: 'nǐ hǎo',
-          alignment_status: 'aligned'
+          alignment_status: 'aligned',
         },
       ]
     },
@@ -54,7 +55,7 @@ const LOW_CONFIDENCE_PARTIAL_RESPONSE = {
         {
           source_text: '你好',
           pinyin_text: 'nǐ hǎo',
-          alignment_status: 'aligned'
+          alignment_status: 'aligned',
         }
       ]
     }
@@ -68,8 +69,78 @@ const LOW_CONFIDENCE_PARTIAL_RESPONSE = {
   ]
 }
 
+const MULTI_LINE_SUCCESS_RESPONSE = {
+  status: 'success',
+  request_id: 'req_multiline',
+  data: {
+    ocr: {
+      segments: [
+        { text: '老师叫', language: 'zh', confidence: 0.95, line_id: 0 },
+        { text: '同学们好', language: 'zh', confidence: 0.94, line_id: 1 },
+      ]
+    },
+    pinyin: {
+      segments: [
+        {
+          source_text: '老师叫',
+          pinyin_text: 'lǎo shī jiào',
+          alignment_status: 'aligned',
+          line_id: 0
+        },
+        {
+          source_text: '同学们好',
+          pinyin_text: 'tóng xué men hǎo',
+          alignment_status: 'aligned',
+          line_id: 1
+        },
+      ]
+    },
+    job_id: null
+  }
+}
+
+const NULL_LINE_ID_SUCCESS_RESPONSE = {
+  status: 'success',
+  request_id: 'req_null_line_id',
+  data: {
+    ocr: {
+      segments: [
+        { text: '老师叫', language: 'zh', confidence: 0.95, line_id: null },
+        { text: '同学们好', language: 'zh', confidence: 0.94, line_id: null },
+      ]
+    },
+    pinyin: {
+      segments: [
+        {
+          source_text: '老师叫',
+          pinyin_text: 'lǎo shī jiào',
+          alignment_status: 'aligned',
+          line_id: null
+        },
+        {
+          source_text: '同学们好',
+          pinyin_text: 'tóng xué men hǎo',
+          alignment_status: 'aligned',
+          line_id: null
+        },
+      ]
+    },
+    job_id: null
+  }
+}
+
 vi.mock('../../../lib/api-client', () => ({
   submitProcessRequest: vi.fn(async () => DEFAULT_SUCCESS_RESPONSE)
+}))
+
+vi.mock('react-image-crop', () => ({
+  default: function ReactCropMock({ children, onComplete }) {
+    React.useEffect(() => {
+      onComplete?.({ x: 0, y: 0, width: 10, height: 10 })
+    }, [onComplete])
+
+    return <div data-testid="react-crop">{children}</div>
+  },
 }))
 
 import { submitProcessRequest } from '../../../lib/api-client'
@@ -84,10 +155,25 @@ function renderWithClient(ui) {
 }
 
 describe('UploadForm', () => {
+  let originalGetContext
+  let originalToBlob
+
   beforeEach(() => {
-    vi.clearAllMocks()
+    submitProcessRequest.mockReset()
+    submitProcessRequest.mockImplementation(async () => DEFAULT_SUCCESS_RESPONSE)
+    // P5: save originals so they can be restored after each test
+    originalGetContext = globalThis.HTMLCanvasElement.prototype.getContext
+    originalToBlob = globalThis.HTMLCanvasElement.prototype.toBlob
+    globalThis.HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+      drawImage: vi.fn(),
+    }))
+    globalThis.HTMLCanvasElement.prototype.toBlob = vi.fn((callback) => {
+      callback(new globalThis.Blob(['cropped'], { type: 'image/jpeg' }))
+    })
   })
   afterEach(() => {
+    globalThis.HTMLCanvasElement.prototype.getContext = originalGetContext
+    globalThis.HTMLCanvasElement.prototype.toBlob = originalToBlob
     cleanup()
   })
 
@@ -142,6 +228,44 @@ describe('UploadForm', () => {
     expect(screen.getByText('Pinyin Reading')).toBeInTheDocument()
     expect(within(pinyinResult).getByText('你好')).toBeInTheDocument()
     expect(within(pinyinResult).getByText('nǐ hǎo')).toBeInTheDocument()
+  })
+
+  it('renders multiline pinyin segments in separate line groups when line ids are present', async () => {
+    submitProcessRequest.mockResolvedValueOnce(MULTI_LINE_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    const { container } = renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await screen.findByLabelText(/pinyin-result/i)
+
+    const lineGroups = container.querySelectorAll('.pinyin-line-group')
+    expect(lineGroups).toHaveLength(2)
+    expect(within(lineGroups[0]).getByText('老师叫')).toBeInTheDocument()
+    expect(within(lineGroups[1]).getByText('同学们好')).toBeInTheDocument()
+  })
+
+  it('falls back to flat pinyin rendering when all line ids are null', async () => {
+    submitProcessRequest.mockResolvedValueOnce(NULL_LINE_ID_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    const { container } = renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    const pinyinResult = await screen.findByLabelText(/pinyin-result/i)
+
+    expect(container.querySelectorAll('.pinyin-line-group')).toHaveLength(0)
+    expect(within(pinyinResult).getByText('老师叫')).toBeInTheDocument()
+    expect(within(pinyinResult).getByText('同学们好')).toBeInTheDocument()
+    expect(container.querySelectorAll('ruby')).toHaveLength(2)
   })
 
   it('shows uncertain segments explicitly when alignment fails for one segment', async () => {
@@ -246,6 +370,96 @@ describe('UploadForm', () => {
     )
   })
 
+  it('shows crop preview for camera capture without immediate submit', async () => {
+    renderWithClient(<UploadForm />)
+
+    const cameraInput = document.querySelector('input[capture="environment"]')
+    expect(cameraInput).not.toBeNull()
+
+    const file = new globalThis.File(['camera-bytes'], 'camera.jpg', { type: 'image/jpeg' })
+    await userEvent.upload(cameraInput, file)
+
+    expect(screen.getByLabelText(/crop-preview/i)).toBeInTheDocument()
+    expect(submitProcessRequest).not.toHaveBeenCalled()
+    expect(screen.queryByText(/waiting for submission/i)).not.toBeInTheDocument()
+  })
+
+  it('dismisses crop preview back to idle without submitting', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    const cameraInput = document.querySelector('input[capture="environment"]')
+    const file = new globalThis.File(['camera-bytes'], 'camera.jpg', { type: 'image/jpeg' })
+    await user.upload(cameraInput, file)
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+
+    expect(submitProcessRequest).not.toHaveBeenCalled()
+    expect(screen.getByText(/waiting for submission/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/crop-preview/i)).not.toBeInTheDocument()
+  })
+
+  it('shows loading spinner while upload is pending', async () => {
+    let resolveRequest
+    submitProcessRequest.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveRequest = () => resolve(DEFAULT_SUCCESS_RESPONSE)
+      })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    expect(screen.getByText(/uploading image/i)).toBeInTheDocument()
+    expect(document.querySelector('.loading-spinner')).not.toBeNull()
+
+    resolveRequest()
+    expect(await screen.findByLabelText(/processing-complete/i)).toBeInTheDocument()
+  })
+
+  it('shows loading spinner while camera crop upload is pending', async () => {
+    let resolveRequest
+    submitProcessRequest.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveRequest = () => resolve(DEFAULT_SUCCESS_RESPONSE)
+      })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    const cameraInput = document.querySelector('input[capture="environment"]')
+    const file = new globalThis.File(['camera-bytes'], 'camera.jpg', { type: 'image/jpeg' })
+    await user.upload(cameraInput, file)
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+
+    expect(await screen.findByText(/uploading image/i)).toBeInTheDocument()
+    expect(document.querySelector('.loading-spinner')).not.toBeNull()
+
+    resolveRequest()
+    expect(await screen.findByLabelText(/processing-complete/i)).toBeInTheDocument()
+  })
+
+  it('submits cropped camera image after confirmation', async () => {
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    const cameraInput = document.querySelector('input[capture="environment"]')
+    const file = new globalThis.File(['camera-bytes'], 'camera.jpg', { type: 'image/jpeg' })
+    await user.upload(cameraInput, file)
+    await user.click(screen.getByRole('button', { name: /confirm/i }))
+
+    await waitFor(() => {
+      expect(submitProcessRequest).toHaveBeenCalledTimes(1)
+    })
+    expect(submitProcessRequest.mock.calls[0][0]).toBeInstanceOf(globalThis.File)
+    expect(await screen.findByLabelText(/processing-complete/i)).toBeInTheDocument()
+  })
+
   it('shows warning guidance when partial response includes pinyin failure warning', async () => {
     submitProcessRequest.mockResolvedValueOnce(DEFAULT_PARTIAL_RESPONSE)
 
@@ -341,7 +555,7 @@ describe('UploadForm', () => {
     expect(screen.getByLabelText(/pinyin-result/i)).toBeInTheDocument()
   })
 
-  it('retries automatically in-flow when a new file is selected after low confidence', async () => {
+  it('requires manual resubmission when a new upload file is selected after low confidence', async () => {
     submitProcessRequest
       .mockResolvedValueOnce(LOW_CONFIDENCE_PARTIAL_RESPONSE)
       .mockResolvedValueOnce(DEFAULT_SUCCESS_RESPONSE)
@@ -360,6 +574,9 @@ describe('UploadForm', () => {
 
     const retryFile = new globalThis.File(['retry-bytes'], 'retry.jpg', { type: 'image/jpeg' })
     await user.upload(uploadInput, retryFile)
+
+    expect(submitProcessRequest).toHaveBeenCalledTimes(1)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
 
     await waitFor(() => {
       expect(submitProcessRequest).toHaveBeenCalledTimes(2)
@@ -388,7 +605,8 @@ describe('UploadForm', () => {
 
 describe('UploadForm styling and accessibility', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    submitProcessRequest.mockReset()
+    submitProcessRequest.mockImplementation(async () => DEFAULT_SUCCESS_RESPONSE)
   })
   afterEach(() => {
     cleanup()
@@ -411,7 +629,7 @@ describe('UploadForm styling and accessibility', () => {
     const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
     await user.upload(screen.getByLabelText(/upload image/i), file)
     await user.click(screen.getByRole('button', { name: /submit/i }))
-    await screen.findByText(/uploading image/i)
+    await screen.findByText((_, element) => element?.textContent === 'Uploading image...')
     expect(document.querySelector('.status-panel--loading')).toBeInTheDocument()
     release(DEFAULT_SUCCESS_RESPONSE)
   })

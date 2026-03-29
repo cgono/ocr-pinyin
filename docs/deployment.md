@@ -49,6 +49,77 @@ If the frontend URL changes, update this value and redeploy the backend.
 2. Open `https://<frontend>.onrender.com` in a browser and confirm the upload form renders.
 3. Submit a test image and confirm the frontend receives pinyin output without CORS errors.
 
+## Staging Environment
+
+The project runs two environments: **staging** (from the `staging` branch) and **production** (from `main`).
+
+### Branch Strategy
+
+```
+feature branches  →  staging  →  main (production)
+```
+
+- Merge feature branches into `staging` to validate before going live.
+- Merge `staging` into `main` to promote to production.
+- Render auto-deploys each environment on push to its branch.
+
+### Staging Services
+
+| Service | Render name |
+|---------|-------------|
+| Backend | `ocr-pinyin-backend-staging` |
+| Frontend | `ocr-pinyin-frontend-staging` |
+
+### Staging Environment Variables (set in Render dashboard)
+
+Set these in each staging service's Environment tab after the Blueprint creates the services.
+
+#### Backend (`ocr-pinyin-backend-staging`)
+
+| Variable | Value |
+|----------|-------|
+| `SENTRY_DSN` | Same DSN as production (Sentry separates environments by tag) |
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | Same GCP service account key as production |
+| `CORS_ALLOW_ORIGINS` | `https://ocr-pinyin-frontend-staging.onrender.com` |
+
+#### Frontend (`ocr-pinyin-frontend-staging`)
+
+| Variable | Value |
+|----------|-------|
+| `VITE_API_BASE_URL` | `https://ocr-pinyin-backend-staging.onrender.com` |
+| `VITE_SENTRY_DSN` | Same DSN as the backend |
+
+`APP_ENV: staging` and `VITE_APP_ENV: staging` are set in `render.yaml` and flow automatically to
+the Sentry `environment` tag — no manual action needed for Sentry tagging.
+
+### Verify Staging
+
+1. Check backend health at `https://ocr-pinyin-backend-staging.onrender.com/v1/health`.
+2. Open `https://ocr-pinyin-frontend-staging.onrender.com` and confirm the upload form renders.
+3. Submit a test image and confirm pinyin output arrives without CORS errors.
+
+### Sentry Environment Filtering
+
+In the Sentry dashboard, use the **Environment** dropdown to filter issues and traces by
+`staging` or `production` independently.
+
+---
+
+## CI Setup
+
+The `render-yaml-check` job in CI validates `render.yaml` using the Render CLI and requires two values to be configured in the GitHub repository:
+
+| Type | Name | Where to find it |
+|------|------|-----------------|
+| Secret | `RENDER_API_KEY` | Render dashboard → Account Settings → API Keys |
+| Variable | `RENDER_WORKSPACE_ID` | Render dashboard → Workspace Settings → General (the ID in the URL) |
+
+Set these under **Settings → Secrets and variables → Actions** in the GitHub repository.
+
+> **Forks:** If you fork this repository and open pull requests, you must configure `RENDER_API_KEY` and `RENDER_WORKSPACE_ID` in your fork's Actions settings for the `render-yaml-check` job to pass.
+
+---
+
 ## Redeploy
 
 Render auto-deploys on every push to the connected branch, typically `main`.

@@ -18,8 +18,13 @@ class StubPinyinProvider:
         return self._segments
 
 
-def _make_ocr_segment(text: str, language: str = "zh", confidence: float = 0.9) -> OcrSegment:
-    return OcrSegment(text=text, language=language, confidence=confidence)
+def _make_ocr_segment(
+    text: str,
+    language: str = "zh",
+    confidence: float = 0.9,
+    line_id: int | None = None,
+) -> OcrSegment:
+    return OcrSegment(text=text, language=language, confidence=confidence, line_id=line_id)
 
 
 def test_generate_pinyin_returns_segment_level_output(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -32,13 +37,24 @@ def test_generate_pinyin_returns_segment_level_output(monkeypatch: pytest.Monkey
             ]
         ),
     )
-    result = asyncio.run(generate_pinyin([_make_ocr_segment("你好")]))
+    result = asyncio.run(generate_pinyin([_make_ocr_segment("你好", line_id=3)]))
 
     assert len(result.segments) == 1
     assert result.segments[0].source_text == "你好"
     assert result.segments[0].pinyin_text == "nǐ hǎo"
     assert result.segments[0].alignment_status == "aligned"
     assert result.segments[0].reason_code is None
+    assert result.segments[0].line_id == 3
+
+
+def test_generate_pinyin_preserves_none_line_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.services.pinyin_service.get_pinyin_provider",
+        lambda: StubPinyinProvider([RawPinyinSegment(hanzi="你", pinyin="nǐ")]),
+    )
+    result = asyncio.run(generate_pinyin([_make_ocr_segment("你")]))
+
+    assert result.segments[0].line_id is None
 
 
 def test_generate_pinyin_produces_one_segment_per_ocr_segment(
@@ -122,8 +138,8 @@ def test_generate_pinyin_marks_uncertain_when_execution_fails(
     result = asyncio.run(
         generate_pinyin(
             [
-                _make_ocr_segment("你好"),
-                _make_ocr_segment("世界"),
+                _make_ocr_segment("你好", line_id=0),
+                _make_ocr_segment("世界", line_id=1),
             ]
         )
     )
@@ -132,3 +148,4 @@ def test_generate_pinyin_marks_uncertain_when_execution_fails(
     assert result.segments[1].alignment_status == "uncertain"
     assert result.segments[1].reason_code == "pinyin_execution_failed"
     assert result.segments[1].source_text == "世界"
+    assert result.segments[1].line_id == 1
