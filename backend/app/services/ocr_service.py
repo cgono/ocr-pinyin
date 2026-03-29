@@ -102,6 +102,7 @@ def _normalize_segment(segment: RawOcrSegment) -> OcrSegment:
         text=(segment.text or "").strip(),
         language=_normalize_language(segment.language),
         confidence=_normalize_confidence(segment.confidence),
+        line_id=segment.line_id,
     )
 
 

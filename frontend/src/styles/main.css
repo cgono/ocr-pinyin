@@ -148,8 +148,22 @@ body {
 
 /* State: loading */
 .status-panel--loading .status-panel__message {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: status-spin 0.8s linear infinite;
+  flex: 0 0 auto;
 }
 
 /* State: error */
@@ -191,6 +205,39 @@ body {
   margin-bottom: var(--space-4);
 }
 
+/* ─── Crop Preview ──────────────────────────────────────────────── */
+
+.crop-preview {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.crop-preview .status-panel__message {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.crop-preview__image {
+  display: block;
+  width: 100%;
+  max-height: min(60vh, 480px);
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.crop-preview .ReactCrop {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: #111522;
+}
+
+.crop-preview__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 /* ─── Pinyin Result ─────────────────────────────────────────────── */
 
 .pinyin-result__title {
@@ -203,6 +250,15 @@ body {
   font-size: var(--font-size-pinyin);
   line-height: var(--line-height-pinyin);
   word-break: break-word;
+}
+
+.pinyin-line-group {
+  display: block;
+  margin-bottom: 1em;
+}
+
+.pinyin-line-group:last-child {
+  margin-bottom: 0;
 }
 
 .pinyin-result__content ruby rt {
@@ -245,4 +301,17 @@ body {
 
 .details-section li {
   margin-bottom: var(--space-1);
+}
+
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 640px) {
+  .crop-preview__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: grid;
+  }
 }

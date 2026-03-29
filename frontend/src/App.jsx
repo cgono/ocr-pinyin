@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { ErrorBoundary } from '@sentry/react'
 
+import { getHealthStatus } from './lib/api-client'
 import UploadForm from './features/process/components/UploadForm'
 
 function ErrorFallback() {
@@ -7,6 +9,10 @@ function ErrorFallback() {
 }
 
 export default function App() {
+  useEffect(() => {
+    getHealthStatus().catch(() => {})
+  }, [])
+
   return (
     <ErrorBoundary fallback={<ErrorFallback />}>
       <main className="app-shell">

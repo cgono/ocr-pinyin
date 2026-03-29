@@ -153,10 +153,11 @@ Enable debugging and runtime visibility with collapsible diagnostics, trace/timi
 **FRs covered:** FR4, FR21, FR22, FR23, FR24, FR25, FR26, FR27, FR28
 **Added:** Story 3.6 (CI build and lockfile checks) — cross-cutting quality gate improvement
 
-### Epic 4: Cost Guardrails & Safe Usage Control
-Keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
+### Epic 4: UX Polish, Cost Guardrails & Safe Usage Control
+Refine the capture-to-result experience based on live MVP testing, and keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
 **Depends on:** Epic 1 (processing path and validation hooks), Epic 3 (metrics/telemetry foundations)
-**FRs covered:** FR29, FR30, FR31, FR32
+**FRs covered:** FR12, FR14, FR15, FR29, FR30, FR31, FR32
+**Added:** Stories 4.1 and 4.2 (UX polish from live MVP testing — camera capture flow and line layout preservation)
 
 ### Epic 5: History, Reuse & Future Evolution
 Allow session/history recall and maintain a clean path to future saved-book workflows and auth evolution.
@@ -507,16 +508,118 @@ So that broken builds and dependency drift are caught before merge rather than a
 **When** CI completes
 **Then** the pipeline status is failed and merge is blocked.
 
-## Epic 4: Cost Guardrails & Safe Usage Control
+## Epic 4: UX Polish, Cost Guardrails & Safe Usage Control
 
-Keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
+Refine the capture-to-result experience based on live MVP testing, and keep the system affordable and predictable with request cost estimation, daily tracking, threshold enforcement/warnings, and input limits.
 **Depends on:** Epic 1 (processing path and validation hooks), Epic 3 (metrics/telemetry foundations)
 
-### Story 4.1: Estimate Per-Request Processing Cost
+### Story 4.0: Document Sprint Change Proposal Process
+
+As Clint,
+I want a clear reference document describing the sprint change proposal process,
+So that any agent or collaborator can trigger, write, and apply a sprint change proposal consistently without relying on institutional memory.
+
+**Acceptance Criteria:**
+
+**Given** a developer or agent needs to propose a mid-sprint scope change
+**When** they consult the process document
+**Then** they find clear guidance on when to trigger a proposal, the required sections, and how to apply the outcome.
+
+**Given** a sprint change proposal is approved
+**When** the implementation handoff occurs
+**Then** the document describes exactly which artifacts get updated (`sprint-status.yaml`, `epics.md`) and how.
+
+**Given** the document exists
+**When** it is reviewed
+**Then** it is consistent with the historical sprint change proposals in `_bmad-output/planning-artifacts/` and does not contradict any of them.
+
+### Story 4.1: Camera Capture Flow — Preview, Crop, Auto-Submit, Loading Spinner, Startup Ping
+
+As Clint,
+I want to preview and crop a captured photo before it is submitted, see a loading animation while processing, and have the backend warmed up by the time I take my first photo,
+So that the capture-to-result flow is smooth and I don't accidentally send irrelevant parts of the image to OCR.
+
+**Acceptance Criteria:**
+
+**Given** I tap Take Photo and the camera opens
+**When** I take a photo and the camera closes
+**Then** a preview of the captured image is displayed
+**And** crop handles are shown so I can select the region to submit.
+
+**Given** a preview with crop handles is shown
+**When** I adjust the crop region and confirm
+**Then** the cropped image is submitted to `POST /v1/process` automatically (no additional Submit tap required for the camera flow).
+
+**Given** I confirm the photo (with or without crop adjustment)
+**When** the upload request is in flight
+**Then** a visible loading spinner (not just text) is displayed in the status panel.
+
+**Given** a crop preview is displayed
+**When** the user dismisses without confirming
+**Then** no upload occurs and the user is returned to the initial state.
+
+**Given** the app loads in the browser
+**When** the page mounts
+**Then** the frontend silently calls `GET /v1/health` in the background to trigger a Render wake-up before the user submits their first photo.
+
+**Given** the startup health ping fails or times out
+**When** the failure occurs
+**Then** the failure is silently ignored with no user-visible error and no blocking of subsequent usage.
+
+### Story 4.2: Preserve Text Line Layout in OCR and Pinyin Results
+
+As Clint,
+I want the pinyin result to preserve the original line breaks from the book page,
+So that I can follow the result alongside the physical book without mentally re-mapping the layout.
+
+**Acceptance Criteria:**
+
+**Given** OCR extracts text from a page with multiple lines
+**When** the result is displayed
+**Then** line breaks from the source are preserved in the pinyin output
+**And** each original line appears on its own visual row, for example:
+```
+老师叫
+lǎo shī jiào
+
+同学们好
+tóng xué men hǎo
+
+我们开始上课了
+wǒ men kāi shǐ shàng kè le
+```
+
+**Given** OCR returns a single unstructured block with no line metadata
+**When** layout cannot be determined
+**Then** the result falls back to the existing rendering (all segments space-joined into a single horizontal run) with no regression.
+
+**Given** a multi-line result is displayed
+**When** the user views the output
+**Then** each character/pinyin pair group has a visible gap below it (e.g. margin or padding) so adjacent line groups are not visually "smooshed" together.
+
+**Given** all existing backend and frontend tests run
+**When** the schema change is applied
+**Then** all existing tests continue to pass.
+
+**Schema change:**
+
+```
+OLD OcrSegment:    { text, language, confidence }
+NEW OcrSegment:    { text, language, confidence, line_id: int | null }
+
+OLD PinyinSegment: { source_text, pinyin_text, alignment_status, reason_code }
+NEW PinyinSegment: { source_text, pinyin_text, alignment_status, reason_code, line_id: int | null }
+```
+
+`line_id` is `null` when line structure is unavailable (graceful fallback). Blank lines shown in the example above are presentational — the visual gap between groups is achieved via CSS spacing, not literal blank lines in the data.
+
+### Story 4.3: Estimate Per-Request Processing Cost
 
 As Clint,
 I want each processing request to include an estimated cost value,
 So that I can understand spend impact per page.
+
+**Note:** Renumbered from Story 4.1 — see sprint-change-proposal-2026-03-28.md
 
 **Acceptance Criteria:**
 
@@ -530,7 +633,7 @@ So that I can understand spend impact per page.
 **Then** response indicates estimate confidence/fallback mode
 **And** processing result still returns normally.
 
-### Story 4.2: Track Daily Aggregate Usage Cost
+### Story 4.4: Track Daily Aggregate Usage Cost
 
 As Clint,
 I want daily cumulative cost tracked across requests,
@@ -548,7 +651,7 @@ So that I can monitor spend against my daily budget target.
 **Then** aggregation resets/segments to the new day correctly
 **And** prior-day values remain available for recent review policy.
 
-### Story 4.3: Enforce or Warn on Daily Budget Threshold
+### Story 4.5: Enforce or Warn on Daily Budget Threshold
 
 As Clint,
 I want configurable budget-threshold warning/enforcement behavior,
@@ -566,7 +669,43 @@ So that I avoid accidental overspend beyond the daily limit.
 **Then** system blocks further expensive processing with structured budget category response
 **And** user receives clear guidance on next steps.
 
-### Story 4.4: Restrict Oversized or High-Cost Inputs
+### Story 4.7: Release-Please Versioning + render.yaml CI Validation
+
+As Clint,
+I want frontend and backend versions incremented automatically based on conventional commits with GitHub Releases created on merge, AND I want render.yaml validated in CI,
+So that I never manually bump versions or publish releases, and a malformed render.yaml is caught before it reaches a deploy.
+
+**Acceptance Criteria:**
+
+**Given** conventional commits have been merged to main
+**When** the release-please workflow runs
+**Then** a "release PR" is opened (or updated) with CHANGELOG.md updated, `frontend/package.json` version bumped, and `backend/pyproject.toml` version bumped
+
+**Given** the release PR is merged
+**When** release-please runs post-merge
+**Then** a GitHub Release is created automatically with the version tag and changelog content
+**And** frontend and backend are versioned independently (monorepo)
+
+**Given** `render.yaml` exists in the repo root
+**When** CI runs on pull requests and main/staging branch pushes
+**Then** the Render CLI downloads and runs `render blueprints validate render.yaml`, failing CI if the file fails Render's own schema validation
+**And** the check runs as a new job in the existing CI workflow
+
+**Given** `render.yaml` is valid
+**When** the check runs
+**Then** it passes and does not block merge
+
+**Given** `render.yaml` contains an invalid value or missing required field
+**When** the check runs
+**Then** CI fails with Render's validation error output
+
+**Given** all existing CI checks
+**When** story 4.7 is implemented
+**Then** all existing jobs continue to pass unaffected
+
+**Note:** Added via sprint-change-proposal-2026-03-29-versioning.md
+
+### Story 4.6: Restrict Oversized or High-Cost Inputs
 
 As Clint,
 I want oversized or risky uploads constrained up front,

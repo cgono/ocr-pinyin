@@ -512,7 +512,10 @@ test-bmad/
 
 **Deployment Structure:**
 - Current local deployment via Docker Compose.
-- Hosted deployment target is Render, with frontend and backend split into separate services and optional Blueprint-based config in `render.yaml`.
+- Hosted deployment target is Render, with frontend and backend split into separate services and Blueprint-based config in `render.yaml`.
+
+**Release Versioning:**
+Package versioning is managed by release-please (`googleapis/release-please-action`), configured for a monorepo with two independent packages: `frontend` (node) and `backend` (python). `release-please-config.json` defines both packages. Conventional commits drive semantic version bumps. On merge to main, release-please creates a release PR updating `CHANGELOG.md`, `frontend/package.json`, and `backend/pyproject.toml`; merging the release PR creates a GitHub Release and tags the commit.
 
 ## Architecture Validation Results
 

@@ -199,6 +199,7 @@ MVP endpoint groups:
 
 - API starts at `/v1` from day one.
 - Breaking changes require new version path; non-breaking additions stay in `v1`.
+- Package releases (frontend and backend) are managed via release-please using conventional commits. GitHub Releases are created automatically on merge to main.
 
 ### Implementation Considerations
 

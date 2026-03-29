@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 
 import { submitProcessRequest } from '../../../lib/api-client'
+import CropPreview from './CropPreview'
 import DiagnosticsPanel from './DiagnosticsPanel'
 
 const recoveryGuidanceByCode = {
@@ -35,9 +36,36 @@ function renderPinyinAnnotation(segment) {
   return segment.pinyin_text
 }
 
+function groupSegmentsByLine(segments) {
+  const hasLineIds = segments.some(seg => seg.line_id != null)
+  if (!hasLineIds) return null
+
+  const groups = []
+  let currentLineId
+  let currentGroup = []
+
+  for (const seg of segments) {
+    if (seg.line_id !== currentLineId && currentGroup.length > 0) {
+      groups.push({ line_id: currentLineId, segments: currentGroup })
+      currentGroup = []
+    }
+
+    currentLineId = seg.line_id
+    currentGroup.push(seg)
+  }
+
+  if (currentGroup.length > 0) {
+    groups.push({ line_id: currentLineId, segments: currentGroup })
+  }
+
+  return groups
+}
+
 export default function UploadForm() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [cropImageUrl, setCropImageUrl] = useState(null)
+  const [cameraFile, setCameraFile] = useState(null)
   const cameraInputRef = useRef(null)
   const [dismissedLowConfidence, setDismissedLowConfidence] = useState(false)
 
@@ -62,9 +90,43 @@ export default function UploadForm() {
     const nextFile = event.target.files?.[0] || null
     setFile(nextFile)
     setDismissedLowConfidence(false)
-    if (nextFile && mutation.data?.warnings?.some(w => w.code === 'ocr_low_confidence')) {
-      mutation.mutate(nextFile)
+  }
+
+  const handleCameraCapture = (event) => {
+    const nextFile = event.target.files?.[0] || null
+    event.target.value = ''
+
+    if (!nextFile) {
+      return
     }
+
+    setCameraFile(nextFile)
+    setCropImageUrl(URL.createObjectURL(nextFile))
+    setDismissedLowConfidence(false)
+    mutation.reset()
+  }
+
+  const handleCropConfirm = (croppedBlob) => {
+    const nextFile = croppedBlob
+      ? new globalThis.File([croppedBlob], cameraFile?.name || 'camera-capture.jpg', {
+          type: croppedBlob.type || cameraFile?.type || 'image/jpeg',
+        })
+      : cameraFile
+
+    setCropImageUrl(null)
+    setFile(nextFile)
+    setCameraFile(nextFile)
+    setDismissedLowConfidence(false)
+    mutation.mutate(nextFile)
+  }
+
+  const handleCropDismiss = () => {
+    setCropImageUrl(null)
+    setCameraFile(null)
+    setFile(null)
+    setPreviewUrl(null)
+    setDismissedLowConfidence(false)
+    mutation.reset()
   }
 
   const handleSubmit = (event) => {
@@ -87,7 +149,7 @@ export default function UploadForm() {
         capture="environment"
         style={{ display: 'none' }}
         aria-hidden="true"
-        onChange={handleFileChange}
+        onChange={handleCameraCapture}
       />
 
       <form onSubmit={handleSubmit} aria-label="process-upload-form">
@@ -110,110 +172,143 @@ export default function UploadForm() {
               onChange={handleFileChange}
             />
           </div>
-          <button type="submit" disabled={mutation.isPending} className="btn-secondary">
+          <button type="submit" disabled={mutation.isPending || !!cropImageUrl} className="btn-secondary">
             {mutation.isPending ? 'Submitting...' : 'Submit'}
           </button>
         </div>
       </form>
 
-      <div className={statusPanelClass(mutation)}>
-        <h2 className="status-panel__title">Processing Status</h2>
-        {!mutation.data && !mutation.error && !mutation.isPending && (
-          <p className="status-panel__message">Waiting for submission.</p>
-        )}
-        {mutation.isPending && (
-          <p className="status-panel__message">Uploading image...</p>
-        )}
-        {mutation.error && (
-          <p role="alert" className="status-panel__alert">
-            {recoveryGuidanceByCode[mutation.error.code] || mutation.error.message}
-          </p>
-        )}
+      {cropImageUrl ? (
+        <div className="status-panel status-panel--idle">
+          <CropPreview
+            imageUrl={cropImageUrl}
+            onConfirm={handleCropConfirm}
+            onDismiss={handleCropDismiss}
+            disabled={mutation.isPending}
+          />
+        </div>
+      ) : (
+        <div className={statusPanelClass(mutation)}>
+          <h2 className="status-panel__title">Processing Status</h2>
+          {!mutation.data && !mutation.error && !mutation.isPending && (
+            <p className="status-panel__message">Waiting for submission.</p>
+          )}
+          {mutation.isPending && (
+            <p className="status-panel__message">
+              <span className="loading-spinner" aria-hidden="true" />
+              Uploading image...
+            </p>
+          )}
+          {mutation.error && (
+            <p role="alert" className="status-panel__alert">
+              {recoveryGuidanceByCode[mutation.error.code] || mutation.error.message}
+            </p>
+          )}
 
-        {mutation.data && (
-          <div>
-            {mutation.data.status === 'success' && (
-              <p aria-label="processing-complete">
-                ✓ Processing complete
-              </p>
-            )}
-            {mutation.data.status === 'partial' && (
-              <p className="status-panel__partial-note" aria-label="processing-partial">
-                Partial result available
-              </p>
-            )}
-            {mutation.data.status === 'partial' && mutation.data.warnings?.length > 0 && (
-              <div aria-label="processing-warnings">
-                {mutation.data.warnings
-                  .filter(w => w.code !== 'ocr_low_confidence')
-                  .map((w, i) => (
-                    <p
-                      key={`${w.code}-${i}`}
-                      className="status-panel__warning"
-                      role="status"
-                    >
-                      {recoveryGuidanceByCode[w.code] || w.message}
-                    </p>
-                  ))}
-              </div>
-            )}
-            {isLowConfidence && !dismissedLowConfidence && (
-              <div className="confidence-guidance" aria-label="low-confidence-guidance">
-                <p className="status-panel__warning">
-                  {recoveryGuidanceByCode['ocr_low_confidence']}
+          {mutation.data && (
+            <div>
+              {mutation.data.status === 'success' && (
+                <p aria-label="processing-complete">
+                  ✓ Processing complete
                 </p>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => cameraInputRef.current?.click()}
-                >
-                  Retake Photo
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setDismissedLowConfidence(true)}
-                >
-                  Use This Result Anyway
-                </button>
-              </div>
-            )}
-            <p className="status-panel__meta">Status: {mutation.data.status}</p>
-            <p className="status-panel__meta">Request ID: {mutation.data.request_id}</p>
+              )}
+              {mutation.data.status === 'partial' && (
+                <p className="status-panel__partial-note" aria-label="processing-partial">
+                  Partial result available
+                </p>
+              )}
+              {mutation.data.status === 'partial' && mutation.data.warnings?.length > 0 && (
+                <div aria-label="processing-warnings">
+                  {mutation.data.warnings
+                    .filter(w => w.code !== 'ocr_low_confidence')
+                    .map((w, i) => (
+                      <p
+                        key={`${w.code}-${i}`}
+                        className="status-panel__warning"
+                        role="status"
+                      >
+                        {recoveryGuidanceByCode[w.code] || w.message}
+                      </p>
+                    ))}
+                </div>
+              )}
+              {isLowConfidence && !dismissedLowConfidence && (
+                <div className="confidence-guidance" aria-label="low-confidence-guidance">
+                  <p className="status-panel__warning">
+                    {recoveryGuidanceByCode['ocr_low_confidence']}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => cameraInputRef.current?.click()}
+                  >
+                    Retake Photo
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setDismissedLowConfidence(true)}
+                  >
+                    Use This Result Anyway
+                  </button>
+                </div>
+              )}
+              <p className="status-panel__meta">Status: {mutation.data.status}</p>
+              <p className="status-panel__meta">Request ID: {mutation.data.request_id}</p>
 
-            {/* Unified result: image + pinyin reading together */}
-            {(previewUrl || pinyinSegments.length > 0) && (
-              <div aria-label="result-view" className="result-view">
-                {previewUrl && (
-                  <div>
-                    <img
-                      src={previewUrl} // codeql[js/xss-through-dom] - always a blob: URL from URL.createObjectURL
-                      alt="Uploaded image"
-                      className="result-image"
-                    />
-                  </div>
-                )}
-
-                {pinyinSegments.length > 0 && (
-                  <div aria-label="pinyin-result">
-                    <h3 className="pinyin-result__title">Pinyin Reading</h3>
-                    <div className="pinyin-result__content">
-                      {pinyinSegments.map((seg, index) => (
-                        <ruby key={`${seg.source_text}-${seg.alignment_status}-${index}`}>
-                          {seg.source_text}
-                          <rt>{renderPinyinAnnotation(seg)}</rt>
-                        </ruby>
-                      ))}
+              {(previewUrl || pinyinSegments.length > 0) && (
+                <div aria-label="result-view" className="result-view">
+                  {previewUrl && (
+                    <div>
+                      <img
+                        src={previewUrl} // codeql[js/xss-through-dom] - always a blob: URL from URL.createObjectURL
+                        alt="Uploaded image"
+                        className="result-image"
+                      />
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
 
-            <DiagnosticsPanel diagnostics={mutation.data?.diagnostics} ocrSegments={ocrSegments} />
-          </div>
-        )}
-      </div>
+                  {pinyinSegments.length > 0 && (
+                    <div aria-label="pinyin-result">
+                      <h3 className="pinyin-result__title">Pinyin Reading</h3>
+                      <div className="pinyin-result__content">
+                        {(() => {
+                          const lineGroups = groupSegmentsByLine(pinyinSegments)
+
+                          if (!lineGroups) {
+                            return pinyinSegments.map((seg, index) => (
+                              <ruby key={`${seg.source_text}-${seg.alignment_status}-${index}`}>
+                                {seg.source_text}
+                                <rt>{renderPinyinAnnotation(seg)}</rt>
+                              </ruby>
+                            ))
+                          }
+
+                          return lineGroups.map((group, groupIndex) => (
+                            <div
+                              key={`line-${group.line_id}-${groupIndex}`}
+                              className="pinyin-line-group"
+                            >
+                              {group.segments.map((seg, segmentIndex) => (
+                                <ruby key={`${seg.source_text}-${seg.alignment_status}-${segmentIndex}`}>
+                                  {seg.source_text}
+                                  <rt>{renderPinyinAnnotation(seg)}</rt>
+                                </ruby>
+                              ))}
+                            </div>
+                          ))
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <DiagnosticsPanel diagnostics={mutation.data?.diagnostics} ocrSegments={ocrSegments} />
+            </div>
+          )}
+        </div>
+      )}
     </section>
   )
 }
