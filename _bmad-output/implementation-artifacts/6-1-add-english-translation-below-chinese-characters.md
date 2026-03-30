@@ -1,6 +1,6 @@
 # Story 6.1: Add English Translation Below Chinese Characters
 
-Status: review
+Status: done
 
 ## Story
 

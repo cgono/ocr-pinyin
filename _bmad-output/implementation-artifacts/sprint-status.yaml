@@ -80,11 +80,11 @@ development_status:
   epic-4-retrospective: done
 
   # Epic 6 is worked before Epic 5 — see sprint-change-proposal-2026-03-29-translation-release.md
-  epic-6: in-progress
-  6-1-add-english-translation-below-chinese-characters: review
+  epic-6: done
+  6-1-add-english-translation-below-chinese-characters: done
   6-2-add-per-line-pronunciation-playback-controls: done
   6-3-add-full-page-sequential-pronunciation-playback: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
 
   epic-5: backlog
   5-1-store-result-artifacts-for-later-retrieval: backlog
