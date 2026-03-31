@@ -4,6 +4,7 @@ version = "0.2.0"
 description = "FastAPI backend for test-bmad."
 requires-python = ">=3.12"
 dependencies = [
+  "google-cloud-translate>=3.0,<4.0",
   "google-cloud-vision>=3.7,<4.0",
   "fastapi==0.129.0",
   "pillow==12.1.1",

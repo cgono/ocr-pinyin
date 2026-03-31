@@ -60,6 +60,8 @@ FR37: System can expose processing capabilities through versioned /v1 endpoints.
 FR38: System can expose history capabilities through versioned /v1 endpoints.
 FR39: System can operate in MVP without user authentication.
 FR40: System can support future migration to Apple ID based authentication.
+FR42: System can return English translation for extracted Chinese text segments.
+FR43: System can optionally infer punctuation and sentence/clause boundaries for Chinese reading output when source text lacks punctuation.
 
 ### NonFunctional Requirements
 
@@ -134,6 +136,8 @@ FR37: Epic 1 - versioned /v1 processing capability
 FR38: Epic 5 - versioned /v1 history capability
 FR39: Epic 1 - MVP no-auth operation
 FR40: Epic 5 - future Apple ID migration path
+FR42: Epic 6 - English translation for extracted Chinese text
+FR43: Epic 6 - optional auto-punctuation and sentence-aware reading groups
 
 ## Epic List
 
@@ -163,10 +167,17 @@ Refine the capture-to-result experience based on live MVP testing, and keep the 
 **FRs covered:** FR12, FR14, FR15, FR29, FR30, FR31, FR32
 **Added:** Stories 4.1 and 4.2 (UX polish from live MVP testing — camera capture flow and line layout preservation)
 
+### Epic 6: Translation & Pronunciation Output
+Add English translation for extracted Chinese text, with architecture extensibility for future audio pronunciation output.
+**Depends on:** Epic 2 (segment alignment), Epic 4 (line_id layout)
+**FRs covered:** FR42, FR43
+**Sprint priority:** Worked before Epic 5 — added via sprint-change-proposal-2026-03-29-translation-release.md
+
 ### Epic 5: History, Reuse & Future Evolution
 Allow session/history recall and maintain a clean path to future saved-book workflows and auth evolution.
 **Depends on:** Epic 1 (core request/response and IDs), Epic 3 (diagnostics payload conventions)
 **FRs covered:** FR33, FR34, FR35, FR36, FR38, FR40
+**Sprint priority:** Follows Epic 6 — see sprint-change-proposal-2026-03-29-translation-release.md
 
 ## Epic 1: Foundation & Capture-to-Result Vertical Slice
 
@@ -762,6 +773,204 @@ So that I never manually bump versions or publish releases, and a malformed rend
 **Then** all existing jobs continue to pass unaffected
 
 **Note:** Added via sprint-change-proposal-2026-03-29-versioning.md
+
+## Epic 6: Translation & Pronunciation Output
+
+Add English translation for extracted Chinese text, with architecture extensibility for future audio pronunciation output.
+**Depends on:** Epic 2 (segment alignment), Epic 4 (line_id layout)
+
+### Story 6.1: Add English Translation Below Chinese Characters
+
+As Clint,
+I want an English translation displayed below each line of Chinese characters in the result,
+So that I can understand the meaning without switching to another app.
+
+**Display format per line group:**
+```
+lǎo shī jiào        ← pinyin (existing)
+老师叫               ← characters (existing)
+Teacher calls out   ← translation (new, smaller/muted style)
+```
+
+**Acceptance Criteria:**
+
+**Given** a successful OCR + pinyin result
+**When** TRANSLATION_ENABLED=true
+**Then** each PinyinSegment in the API response includes translation_text (non-null string)
+**And** the frontend renders translation_text below the character row in smaller, muted styling.
+
+**Given** TRANSLATION_ENABLED=false or the translation call fails
+**When** the result is returned
+**Then** translation_text is null
+**And** the existing display is unchanged with no regression.
+
+**Given** all existing backend and frontend tests run
+**When** the schema change is applied
+**Then** all existing tests continue to pass.
+
+**Schema change:**
+```
+OLD PinyinSegment: { source_text, pinyin_text, alignment_status, reason_code, line_id }
+NEW PinyinSegment: { source_text, pinyin_text, alignment_status, reason_code, line_id, translation_text }
+```
+
+`translation_text` is `null` when `TRANSLATION_ENABLED=false` or translation unavailable.
+Translation is per line group (one translation per `line_id` group, not per character).
+
+**Note:** Added via sprint-change-proposal-2026-03-29-translation-release.md
+
+### Story 6.2: Add Per-Line Pronunciation Playback Controls
+
+As Clint,
+I want to play back the pronunciation for each rendered line of Chinese text,
+So that I can hear the line while following the page without leaving the app.
+
+**Acceptance Criteria:**
+
+**Given** a successful OCR + pinyin result with grouped lines
+**When** the browser supports speech synthesis
+**Then** each rendered line group includes a pronunciation playback control
+**And** activating the control speaks that line's combined Chinese source text without changing the API response contract.
+
+**Given** a rendered line group contains multiple `PinyinSegment` items with the same `line_id`
+**When** pronunciation playback is triggered for that line
+**Then** the spoken text is built from the concatenated `source_text` values for that line group in order
+**And** playback is scoped to that line only.
+
+**Given** pronunciation playback is already active for one line
+**When** the user starts playback for another line or stops the current line
+**Then** the previous utterance is cancelled
+**And** the UI state updates so only the active line is shown as playing.
+
+**Given** the browser does not support speech synthesis, cannot find a suitable Chinese voice, or playback fails
+**When** the result is displayed or playback is attempted
+**Then** the existing reading result remains fully usable
+**And** pronunciation controls are disabled or hidden with a non-blocking fallback message
+**And** no backend error or response-contract change is introduced.
+
+**Given** all existing frontend and backend tests run
+**When** story 6.2 is implemented
+**Then** all existing tests continue to pass.
+
+**Note:** Inferred during create-story on 2026-03-30 from Epic 6's reserved "future audio pronunciation" scope and Story 6.1's line-group rendering model.
+
+### Story 6.3: Add Full-Page Sequential Pronunciation Playback
+
+As Clint,
+I want to play the current page's Chinese lines from top to bottom,
+So that I can follow the whole reading flow without tapping each line individually.
+
+**Acceptance Criteria:**
+
+**Given** a successful OCR + pinyin result with grouped lines and pronunciation playback support
+**When** the user starts full-page playback
+**Then** the UI plays each rendered line group's combined Chinese source text in visual order
+**And** only one utterance is active at a time
+**And** the active line is clearly indicated while playback advances.
+
+**Given** full-page playback is active
+**When** the user stops playback, starts playback on a different line, or a new result replaces the current page
+**Then** the current utterance and any queued continuation are cancelled immediately
+**And** playback state resets without leaving stale active indicators.
+
+**Given** full-page playback reaches the last available line
+**When** the final utterance finishes
+**Then** playback stops automatically
+**And** the UI returns to the idle state with no active line or page-level playing status.
+
+**Given** the browser does not support speech synthesis, cannot find a suitable Chinese voice, or playback fails mid-sequence
+**When** the result is displayed or playback is attempted
+**Then** the existing reading result remains fully usable
+**And** full-page playback controls are disabled or hidden with the same non-blocking fallback pattern used for per-line playback
+**And** no backend error or response-contract change is introduced.
+
+**Given** all existing frontend and backend tests run
+**When** story 6.3 is implemented
+**Then** all existing tests continue to pass.
+
+**Note:** Inferred during create-story on 2026-03-30 from the remaining Epic 6 audio-pronunciation scope, the UX goal of uninterrupted page-reading flow, and the browser-based playback foundation established in Story 6.2.
+
+### Story 6.4: Add Optional Auto-Punctuation and Sentence-Aware Reading Groups
+
+As Clint,
+I want the app to infer punctuation and sentence/clause grouping for Chinese text that arrives without punctuation,
+So that the reading result is easier to follow, wraps more naturally, and spoken playback includes more natural pauses.
+
+**Acceptance Criteria:**
+
+**Given** OCR and pinyin succeed for Chinese text that contains little or no punctuation
+**When** the result is displayed
+**Then** the API may return a separate `data.reading` projection with derived punctuated reading groups
+**And** the raw `data.ocr` and `data.pinyin` payloads remain unchanged for diagnostics and fallback use.
+
+**Given** a reading projection is present
+**When** the UI renders the primary reading view
+**Then** it uses `reading.groups` as the default reading surface
+**And** each reading group references canonical `pinyin.segments` via `segment_indexes`
+**And** no duplicated ruby-ready token payload is introduced into the API contract.
+
+**Given** a reading group spans more than one raw pinyin segment
+**When** the backend builds `reading.groups`
+**Then** the group may combine multiple adjacent raw segments
+**And** grouping is limited to adjacent segments with the same `line_id`
+**And** the original segment order is preserved.
+
+**Given** auto-punctuation was applied
+**When** line-level or page-level pronunciation playback is triggered
+**Then** playback uses the derived `playback_text` from the reading group where available
+**And** the UI can communicate that auto-punctuation was applied through explicit provider metadata.
+
+**Given** punctuation inference is disabled, unavailable, fails, or produces no useful grouping improvement
+**When** the result is displayed
+**Then** the app falls back to the current line-group rendering and playback behavior
+**And** no OCR or pinyin result data is lost.
+
+**Given** the reading projection is generated by different provider types over time
+**When** the API returns `data.reading`
+**Then** the provider boundary is explicit through metadata that can represent `heuristic`, `remote_service`, or `llm`
+**And** the contract remains stable as the implementation evolves.
+
+**Given** all existing backend and frontend tests run
+**When** story 6.4 is implemented
+**Then** current raw-segment contracts remain backward compatible
+**And** the new behavior is covered by targeted tests for fallback, grouping, and playback text selection.
+
+**Schema direction:**
+```json
+{
+  "data": {
+    "ocr": { "segments": [] },
+    "pinyin": { "segments": [] },
+    "reading": {
+      "mode": "derived",
+      "provider": {
+        "kind": "heuristic",
+        "name": "built_in_rules",
+        "version": "v1",
+        "applied": true,
+        "confidence": 0.78,
+        "request_id": null,
+        "warnings": []
+      },
+      "groups": [
+        {
+          "group_id": "rg_0",
+          "line_id": 0,
+          "raw_text": "老师叫同学们好我们开始上课了",
+          "display_text": "老师叫同学们好，我们开始上课了。",
+          "playback_text": "老师叫同学们好，我们开始上课了。",
+          "confidence": 0.78,
+          "segment_indexes": [0, 1, 2]
+        }
+      ]
+    }
+  }
+}
+```
+
+**Note:** Added via sprint-change-proposal-2026-03-31-auto-punctuation.md
+
+---
 
 ## Epic 5: History, Reuse & Future Evolution
 

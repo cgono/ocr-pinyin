@@ -22,7 +22,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 **Functional Requirements:**
 The product requires an end-to-end processing workflow that begins with phone-based image upload and performs quality validation, OCR extraction of Chinese text, language filtering, and Hanyu Pinyin generation. Results must be returned in both API-friendly JSON and phone-friendly HTML views, including original image context and aligned output where possible. The system must support explicit partial-result behavior and retry flows instead of binary success/fail responses.
 
-Operationally, the requirements include service health/metrics endpoints, diagnostics visibility (raw OCR output, confidence indicators, timing, trace data), lightweight usage history retrieval, and a versioned `/v1` API contract. The MVP runs unauthenticated in a personal environment, but must preserve a migration path toward Apple ID authentication and broader content-management capabilities in future phases.
+Operationally, the requirements include service health/metrics endpoints, diagnostics visibility (raw OCR output, confidence indicators, timing, trace data), lightweight usage history retrieval, and a versioned `/v1` API contract. The MVP runs unauthenticated in a personal environment, but must preserve a migration path toward Apple ID authentication and broader content-management capabilities in future phases. Reading quality can also be enhanced by an additive derived-reading projection that infers punctuation and sentence/clause grouping for punctuationless Chinese text without mutating the raw OCR or pinyin records.
 
 **Non-Functional Requirements:**
 Architecture is strongly shaped by correctness-first output quality for reading/pronunciation use, with latency as a secondary but explicit constraint (target under 2 seconds for typical inputs). Reliability expectations require structured outcomes for every request and graceful degradation on uncertain OCR or provider/tool failures. Security and privacy expectations include TLS transport, private artifact handling, and externalized secret management.
@@ -533,13 +533,14 @@ The proposed project tree supports all architectural decisions. Service, adapter
 ### Requirements Coverage Validation ✅
 
 **Epic/Feature Coverage:**
-Feature areas in the PRD are mapped to concrete modules: processing, diagnostics, cost guardrail, health/metrics, and history contract surface.
+Feature areas in the PRD are mapped to concrete modules: processing, diagnostics, cost guardrail, health/metrics, history contract surface, and a future derived-reading projection for assistive punctuation/grouping.
 
 **Functional Requirements Coverage:**
 All FR categories have architectural support:
 - image intake/validation
 - OCR and language filtering
 - pinyin generation and result rendering
+- derived reading projection for punctuation/grouping while preserving raw segment contracts
 - error handling and retry behavior
 - diagnostics and observability
 - budget/cost governance

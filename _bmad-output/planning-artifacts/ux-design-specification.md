@@ -24,7 +24,7 @@ completedAt: 2026-03-01T01:11:23Z
 
 ### Project Vision
 
-test-bmad is a phone-first reading assistant that converts photos of Chinese children's storybook pages into accurate, sentence-level pinyin so Clint can read naturally with his daughter. The product is intentionally dual-purpose: it must deliver practical reading support while also serving as a hands-on learning platform for LangChain orchestration, tool usage, and skills integration. The UX direction is "accuracy and clarity first, complexity on demand," so the interface stays focused during reading while preserving transparent diagnostics when needed.
+test-bmad is a phone-first reading assistant that converts photos of Chinese children's storybook pages into accurate, sentence-level pinyin so Clint can read naturally with his daughter. The product is intentionally dual-purpose: it must deliver practical reading support while also serving as a hands-on learning platform for LangChain orchestration, tool usage, and skills integration. The UX direction is "accuracy and clarity first, complexity on demand," so the interface stays focused during reading while preserving transparent diagnostics when needed. Where source text lacks punctuation, the product may use an assistive derived-reading layer to infer punctuation and sentence/clause grouping for the primary reading surface while still preserving access to the raw extracted form.
 
 ### Target Users
 
@@ -58,7 +58,7 @@ Design MVP layout to accommodate future English translation and long-term "compi
 
 ### Defining Experience
 
-The core experience of test-bmad is a repeatable page-reading loop: capture or upload a Chinese storybook page, receive sentence-level pinyin, continue reading, then immediately process the next page. The product succeeds when this loop feels continuous and unobtrusive during live reading with a child. The UX should minimize context switching and keep the user anchored in a single focused flow.
+The core experience of test-bmad is a repeatable page-reading loop: capture or upload a Chinese storybook page, receive sentence-level pinyin, continue reading, then immediately process the next page. The product succeeds when this loop feels continuous and unobtrusive during live reading with a child. The UX should minimize context switching and keep the user anchored in a single focused flow. For punctuationless pages, sentence-level readability may come from inferred punctuation/grouping in the primary reading view rather than from the source page alone.
 
 ### Platform Strategy
 
