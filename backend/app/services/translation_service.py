@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 
 from app.adapters.translation_provider import (
     TranslationExecutionError,
@@ -15,6 +16,9 @@ from app.schemas.process import PinyinData, PinyinSegment
 logger = logging.getLogger(__name__)
 
 _TRANSLATION_TIMEOUT_SECONDS: float = 5.0
+# Bounded executor: wait_for cancels the await but not the underlying thread. Capping
+# max_workers limits how many stalled threads can accumulate when provider calls hang.
+_TRANSLATION_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="translation")
 
 
 def _translation_enabled() -> bool:
@@ -24,7 +28,9 @@ def _translation_enabled() -> bool:
 def _clone_with_translation(
     segments: Iterable[PinyinSegment], translation_text: str | None
 ) -> list[PinyinSegment]:
-    return [segment.model_copy(update={"translation_text": translation_text}) for segment in segments]
+    return [
+        segment.model_copy(update={"translation_text": translation_text}) for segment in segments
+    ]
 
 
 def _group_segments_by_line(segments: list[PinyinSegment]) -> list[list[PinyinSegment]]:
@@ -78,7 +84,7 @@ async def enrich_translations(pinyin_data: PinyinData) -> PinyinData:
         try:
             translation_text = await asyncio.wait_for(
                 loop.run_in_executor(
-                    None,
+                    _TRANSLATION_EXECUTOR,
                     lambda text=source_text: provider.translate(
                         text=text,
                         target_language="en",

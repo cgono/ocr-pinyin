@@ -44,7 +44,9 @@ class GoogleCloudTranslateProvider:
                 format_="text",
             )
             if not isinstance(response, dict):
-                raise TranslationExecutionError("Translate API returned an unexpected response type")
+                raise TranslationExecutionError(
+                    "Translate API returned an unexpected response type"
+                )
             translated_text = response.get("translatedText")
             if not isinstance(translated_text, str) or not translated_text.strip():
                 raise TranslationExecutionError("Translate API returned an empty translation")

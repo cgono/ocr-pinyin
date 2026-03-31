@@ -36,13 +36,13 @@ def test_translate_provider_initializes_client_with_credentials_without_project_
 def test_translate_provider_raises_typed_error_when_client_init_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class Boom(Exception):
+    class BoomError(Exception):
         pass
 
     class FailingTranslateClient:
         def __init__(self, credentials=None) -> None:
             _ = credentials
-            raise Boom("bad init")
+            raise BoomError("bad init")
 
     translate_module = type("TranslateModule", (), {"Client": FailingTranslateClient})
     service_account_module = type(
@@ -82,7 +82,11 @@ def test_translate_raises_execution_error_when_api_returns_none(
     service_account_module = type(
         "ServiceAccountModule",
         (),
-        {"Credentials": type("Creds", (), {"from_service_account_info": Mock(return_value="creds")})},
+        {
+            "Credentials": type(
+                "Creds", (), {"from_service_account_info": Mock(return_value="creds")}
+            )
+        },
     )
 
     monkeypatch.setattr("google.cloud.translate_v2", translate_module, raising=False)

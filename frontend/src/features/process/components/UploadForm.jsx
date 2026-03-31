@@ -223,7 +223,7 @@ function normalizeFallbackGroups(lineGroups) {
 }
 
 function selectChineseVoice(voices) {
-  return voices.find((voice) => /^zh\b/i.test(voice.lang) || /^cmn\b/i.test(voice.lang)) ?? null
+  return voices.find((voice) => /^zh[-_]/i.test(voice.lang) || /^cmn[-_]/i.test(voice.lang)) ?? null
 }
 
 function buildSpokenLineText(group) {
