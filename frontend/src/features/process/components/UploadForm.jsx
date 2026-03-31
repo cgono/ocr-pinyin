@@ -230,10 +230,6 @@ function buildSpokenLineText(group) {
   return group.segments.map((segment) => segment.source_text).join('')
 }
 
-function buildLineKey(group, groupIndex) {
-  return `${group.line_id ?? 'line'}-${groupIndex}`
-}
-
 export default function UploadForm() {
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)

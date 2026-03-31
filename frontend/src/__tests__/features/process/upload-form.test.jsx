@@ -897,6 +897,27 @@ describe('UploadForm', () => {
     expect(screen.getByRole('button', { name: /play pronunciation for 同学们好/i })).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('prefers derived playback_text for page playback order', async () => {
+    submitProcessRequest.mockResolvedValueOnce(DERIVED_READING_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play page pronunciation playback/i }))
+
+    expect(speechMock.utterances[0].text).toBe('老师，好。')
+
+    speechMock.utterances[0].onend?.()
+    await waitFor(() => {
+      expect(speechMock.utterances[1].text).toBe('我们开始上课。')
+    })
+  })
+
   it('queues the next page line after the current onend callback completes', async () => {
     submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
 
