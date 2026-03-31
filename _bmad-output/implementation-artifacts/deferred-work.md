@@ -8,6 +8,12 @@
 - `lineKey` includes `groupIndex` alongside `line_id` — could mismatch if group order shifts; unlikely in practice given deterministic `groupSegmentsByLine` output
 - Fallback message not shown before first successful result — `speechFallbackMessage` is set on mount but the `<p>` is gated inside `pinyinSegments.length > 0`; acceptable for current story scope
 
+## Deferred from: code review of 6-5-improve-reading-heuristic-with-clause-final-particle-detection (2026-03-31)
+
+- `clause_length` counts all characters including spaces, punctuation, and mixed-script glyphs without reset — inflates the preceding-char count for the minimum-length guard on mixed-content OCR output; unlikely to matter for typical Chinese text
+- Early-return on terminal punctuation skips all particle processing — `_derive_display_text` returns unchanged text for already-punctuated input, so mid-string particles are never processed; intentional per AC 4 but asymmetric and undocumented
+- Interior CJK punctuation (、…—) does not reset `clause_length` — a particle appearing just after `、` has an inflated preceding-char count; edge case for OCR content
+
 ## Deferred from: code review of 6-4-add-optional-auto-punctuation-and-sentence-aware-reading-groups (2026-03-31)
 
 - `_derive_display_text` appends 。 to text ending in closing brackets/quotes (e.g., `「好。」` → `「好。」。`) — v1 heuristic known limitation; improve terminal-punctuation detection in a future reading service iteration

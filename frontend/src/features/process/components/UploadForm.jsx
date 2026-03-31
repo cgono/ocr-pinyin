@@ -61,6 +61,62 @@ function groupSegmentsByLine(segments) {
   return groups
 }
 
+function splitSegmentAtInfixPunctuation(displayText, startCursor, segment) {
+  const sourceChs = [...segment.source_text]
+  const syllables = segment.pinyin_text ? segment.pinyin_text.trim().split(/\s+/) : []
+
+  const parts = []
+  let displayIdx = startCursor
+  let sourceIdx = 0
+  let syllableIdx = 0
+  let runDisplayStart = startCursor
+  let prefixStart = startCursor
+  let runSourceStart = 0
+  let inRun = false
+
+  while (displayIdx < displayText.length && sourceIdx < sourceChs.length) {
+    if (displayText[displayIdx] === sourceChs[sourceIdx]) {
+      if (!inRun) {
+        runDisplayStart = displayIdx
+        runSourceStart = sourceIdx
+        inRun = true
+      }
+      displayIdx++
+      sourceIdx++
+    } else {
+      if (inRun) {
+        const runSourceText = segment.source_text.slice(runSourceStart, sourceIdx)
+        const charCount = [...runSourceText].length
+        const runPinyin = syllables.slice(syllableIdx, syllableIdx + charCount).join(' ')
+        syllableIdx += charCount
+        parts.push({
+          prefixText: displayText.slice(prefixStart, runDisplayStart),
+          segment: { ...segment, source_text: runSourceText, pinyin_text: runPinyin },
+        })
+        prefixStart = displayIdx
+        inRun = false
+      }
+      displayIdx++
+    }
+  }
+
+  if (sourceIdx < sourceChs.length) {
+    return null
+  }
+
+  if (inRun) {
+    const runSourceText = segment.source_text.slice(runSourceStart, sourceIdx)
+    const charCount = [...runSourceText].length
+    const runPinyin = syllables.slice(syllableIdx, syllableIdx + charCount).join(' ')
+    parts.push({
+      prefixText: displayText.slice(prefixStart, runDisplayStart),
+      segment: { ...segment, source_text: runSourceText, pinyin_text: runPinyin },
+    })
+  }
+
+  return { parts, endCursor: displayIdx }
+}
+
 function buildDisplayParts(displayText, segments) {
   if (!displayText) return null
 
@@ -69,15 +125,18 @@ function buildDisplayParts(displayText, segments) {
 
   for (const segment of segments) {
     const nextIndex = displayText.indexOf(segment.source_text, cursor)
-    if (nextIndex < 0) {
-      return null
+    if (nextIndex >= 0) {
+      parts.push({
+        prefixText: displayText.slice(cursor, nextIndex),
+        segment,
+      })
+      cursor = nextIndex + segment.source_text.length
+    } else {
+      const result = splitSegmentAtInfixPunctuation(displayText, cursor, segment)
+      if (!result) return null
+      parts.push(...result.parts)
+      cursor = result.endCursor
     }
-
-    parts.push({
-      prefixText: displayText.slice(cursor, nextIndex),
-      segment,
-    })
-    cursor = nextIndex + segment.source_text.length
   }
 
   return {

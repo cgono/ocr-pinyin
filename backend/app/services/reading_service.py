@@ -11,7 +11,9 @@ from app.schemas.process import (
 )
 
 _PROVIDER_NAME = "built_in_rules"
-_PROVIDER_VERSION = "v1"
+_PROVIDER_VERSION = "v2"
+_CLAUSE_FINAL_PARTICLES = ("了", "呢", "啊", "啦", "哦", "嘛", "吧", "哈", "喔")
+_MIN_CLAUSE_LENGTH = 2
 _TERMINAL_PUNCTUATION = ("。", "！", "？", ".", "!", "?")
 
 
@@ -50,9 +52,26 @@ def _concat_source_text(group: Iterable[tuple[int, PinyinSegment]]) -> str:
 def _derive_display_text(raw_text: str) -> str:
     if not raw_text:
         return raw_text
+
     if raw_text.endswith(_TERMINAL_PUNCTUATION):
         return raw_text
-    return f"{raw_text}。"
+
+    chars: list[str] = []
+    clause_length = 0
+
+    for index, char in enumerate(raw_text):
+        chars.append(char)
+        clause_length += 1
+
+        if (
+            char in _CLAUSE_FINAL_PARTICLES
+            and index < len(raw_text) - 1
+            and clause_length > _MIN_CLAUSE_LENGTH
+        ):
+            chars.append("，")
+            clause_length = 0
+
+    return f"{''.join(chars)}。"
 
 
 def build_reading_projection(pinyin_data: PinyinData) -> ReadingData | None:

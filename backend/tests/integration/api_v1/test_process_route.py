@@ -268,6 +268,7 @@ def test_process_route_success_adds_reading_projection_without_mutating_raw_payl
     ]
     assert response.data.reading is not None
     assert response.data.reading.provider.kind == "heuristic"
+    assert response.data.reading.provider.version == "v2"
     assert response.data.reading.groups[0].segment_indexes == [0, 1]
     assert response.data.reading.groups[0].display_text == "老师好。"
     assert response.data.reading.groups[1].segment_indexes == [2]
