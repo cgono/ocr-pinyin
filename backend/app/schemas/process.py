@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.schemas.diagnostics import DiagnosticsPayload
 
 ErrorCategory = Literal["validation", "ocr", "pinyin", "system", "budget", "upstream"]
+ReadingProviderKind = Literal["heuristic", "remote_service", "llm"]
 
 
 class OcrSegment(BaseModel):
@@ -31,11 +32,38 @@ class PinyinData(BaseModel):
     segments: list[PinyinSegment]
 
 
+class ReadingProviderInfo(BaseModel):
+    kind: ReadingProviderKind
+    name: str
+    version: str
+    applied: bool
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    request_id: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ReadingGroup(BaseModel):
+    group_id: str
+    line_id: int = Field(ge=0)
+    raw_text: str
+    display_text: str
+    playback_text: str
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    segment_indexes: list[int] = Field(min_length=1)
+
+
+class ReadingData(BaseModel):
+    mode: Literal["derived"]
+    provider: ReadingProviderInfo
+    groups: list[ReadingGroup] = Field(default_factory=list)
+
+
 class ProcessData(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     ocr: OcrData | None = None
     pinyin: PinyinData | None = None
+    reading: ReadingData | None = None
     message: str | None = None
     job_id: str | None = None
 

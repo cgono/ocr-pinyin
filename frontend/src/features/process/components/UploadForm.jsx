@@ -61,16 +61,114 @@ function groupSegmentsByLine(segments) {
   return groups
 }
 
+function buildDisplayParts(displayText, segments) {
+  if (!displayText) return null
+
+  const parts = []
+  let cursor = 0
+
+  for (const segment of segments) {
+    const nextIndex = displayText.indexOf(segment.source_text, cursor)
+    if (nextIndex < 0) {
+      return null
+    }
+
+    parts.push({
+      prefixText: displayText.slice(cursor, nextIndex),
+      segment,
+    })
+    cursor = nextIndex + segment.source_text.length
+  }
+
+  return {
+    parts,
+    suffixText: displayText.slice(cursor),
+  }
+}
+
+function resolveDerivedReadingGroups(reading, pinyinSegments) {
+  if (!reading?.provider?.applied || !Array.isArray(reading.groups) || reading.groups.length === 0) {
+    return null
+  }
+
+  const resolvedGroups = []
+
+  for (const group of reading.groups) {
+    if (!Array.isArray(group.segment_indexes) || group.segment_indexes.length === 0) {
+      return null
+    }
+
+    const segments = group.segment_indexes.map((segmentIndex) => pinyinSegments[segmentIndex])
+    if (segments.some(segment => !segment)) {
+      return null
+    }
+
+    for (let index = 1; index < group.segment_indexes.length; index += 1) {
+      if (group.segment_indexes[index] !== group.segment_indexes[index - 1] + 1) {
+        return null
+      }
+    }
+
+    const lineId = segments[0].line_id
+    if (lineId == null || segments.some(segment => segment.line_id !== lineId)) {
+      return null
+    }
+
+    if (group.line_id !== lineId) {
+      return null
+    }
+
+    const displayParts = buildDisplayParts(group.display_text, segments)
+    if (!displayParts) {
+      return null
+    }
+
+    resolvedGroups.push({
+      group_id: group.group_id,
+      line_id: lineId,
+      segments,
+      displayParts,
+      playbackText: group.playback_text || group.display_text,
+      labelText: group.playback_text || group.display_text,
+      translationText: segments.find(segment => segment.translation_text)?.translation_text ?? null,
+    })
+  }
+
+  return resolvedGroups
+}
+
+function buildFallbackRenderParts(segments) {
+  return {
+    parts: segments.map(segment => ({
+      prefixText: '',
+      segment,
+    })),
+    suffixText: '',
+  }
+}
+
+function normalizeFallbackGroups(lineGroups) {
+  if (!lineGroups?.length) {
+    return null
+  }
+
+  return lineGroups.map((group, groupIndex) => ({
+    group_id: `fallback-${group.line_id ?? 'line'}-${groupIndex}`,
+    line_id: group.line_id,
+    segments: group.segments,
+    displayParts: buildFallbackRenderParts(group.segments),
+    playbackText: buildSpokenLineText(group),
+    labelText: buildSpokenLineText(group),
+    translationText: group.segments.find(segment => segment.translation_text)?.translation_text ?? null,
+  }))
+}
+
 function selectChineseVoice(voices) {
   return voices.find((voice) => /^zh\b/i.test(voice.lang) || /^cmn\b/i.test(voice.lang)) ?? null
 }
 
 function buildSpokenLineText(group) {
   return group.segments.map((segment) => segment.source_text).join('')
-}
-
-function buildLineKey(group, groupIndex) {
-  return `${group.line_id ?? 'line'}-${groupIndex}`
 }
 
 export default function UploadForm() {
@@ -160,9 +258,12 @@ export default function UploadForm() {
 
   const pinyinSegments = mutation.data?.data?.pinyin?.segments || []
   const ocrSegments = mutation.data?.data?.ocr?.segments || []
+  const readingData = mutation.data?.data?.reading || null
   const isLowConfidence = mutation.data?.warnings?.some(w => w.code === 'ocr_low_confidence') ?? false
   const lineGroups = groupSegmentsByLine(pinyinSegments)
-  const hasGroupedLines = (lineGroups?.length ?? 0) > 0
+  const derivedReadingGroups = resolveDerivedReadingGroups(readingData, pinyinSegments)
+  const playbackGroups = derivedReadingGroups ?? normalizeFallbackGroups(lineGroups)
+  const hasPlaybackGroups = (playbackGroups?.length ?? 0) > 0
 
   function clearActivePlayback() {
     if (queuedPagePlaybackTimeoutRef.current != null) {
@@ -297,14 +398,14 @@ export default function UploadForm() {
   }
 
   function startPagePlayback(groupIndex = 0) {
-    if (!hasGroupedLines || !lineGroups?.[groupIndex]) {
+    if (!hasPlaybackGroups || !playbackGroups?.[groupIndex]) {
       clearActivePlayback()
       return
     }
 
-    const group = lineGroups[groupIndex]
-    const lineText = buildSpokenLineText(group)
-    const lineKey = buildLineKey(group, groupIndex)
+    const group = playbackGroups[groupIndex]
+    const lineText = group.playbackText
+    const lineKey = group.group_id
 
     startUtterance({
       lineText,
@@ -313,7 +414,7 @@ export default function UploadForm() {
       onSequenceEnd: () => {
         const nextIndex = groupIndex + 1
 
-        if (!lineGroups?.[nextIndex]) {
+        if (!playbackGroups?.[nextIndex]) {
           clearActivePlayback()
           return
         }
@@ -326,9 +427,9 @@ export default function UploadForm() {
     })
   }
 
-  const handleLinePlayback = (group, groupIndex) => {
-    const lineText = buildSpokenLineText(group)
-    const lineKey = buildLineKey(group, groupIndex)
+  const handleLinePlayback = (group) => {
+    const lineText = group.playbackText
+    const lineKey = group.group_id
 
     if (!selectedVoice || !lineText) {
       return
@@ -348,7 +449,7 @@ export default function UploadForm() {
   }
 
   const handlePagePlayback = () => {
-    if (!selectedVoice || !hasGroupedLines) {
+    if (!selectedVoice || !hasPlaybackGroups) {
       return
     }
 
@@ -494,7 +595,7 @@ export default function UploadForm() {
                     <div aria-label="pinyin-result">
                       <div className="pinyin-result__header">
                         <h3 className="pinyin-result__title">Pinyin Reading</h3>
-                        {hasGroupedLines && (
+                        {hasPlaybackGroups && (
                           <button
                             type="button"
                             className="pinyin-playback-button pinyin-playback-button--page"
@@ -520,30 +621,42 @@ export default function UploadForm() {
                           {speechFallbackMessage}
                         </p>
                       )}
+                      {derivedReadingGroups && readingData?.provider?.applied && (
+                        <p className="pinyin-reading-note" role="status">
+                          Auto-punctuation applied by {readingData.provider.name}.
+                        </p>
+                      )}
                       <div className="pinyin-result__content">
-                        {hasGroupedLines ? lineGroups.map((group, groupIndex) => {
-                          const spokenLineText = buildSpokenLineText(group)
-                          const lineKey = buildLineKey(group, groupIndex)
+                        {hasPlaybackGroups ? playbackGroups.map((group, groupIndex) => {
+                          const spokenLineText = group.labelText
+                          const lineKey = group.group_id
                           const isPlaying = activeLineKey === lineKey
                           const isPlaybackDisabled = !!speechFallbackMessage || !selectedVoice || !spokenLineText
                           const buttonLabel = isPlaybackDisabled
                             ? `Pronunciation unavailable for ${spokenLineText}`
                             : `${isPlaying ? 'Stop' : 'Play'} pronunciation for ${spokenLineText}`
-                          const translationSegment = group.segments.find(s => s.translation_text)
 
                           return (
                             <div
-                              key={`line-${group.line_id}-${groupIndex}`}
+                              key={`line-${group.line_id}-${groupIndex}-${group.group_id}`}
                               className={`pinyin-line-group${isPlaying ? ' pinyin-line-group--active' : ''}`}
                             >
                               <div className="pinyin-line-group__header">
                                 <div className="pinyin-line-group__ruby">
-                                  {group.segments.map((seg, segmentIndex) => (
-                                    <ruby key={`${seg.source_text}-${seg.alignment_status}-${segmentIndex}`}>
-                                      {seg.source_text}
-                                      <rt>{renderPinyinAnnotation(seg)}</rt>
-                                    </ruby>
+                                  {group.displayParts.parts.map(({ prefixText, segment }, segmentIndex) => (
+                                    <span key={`${segment.source_text}-${segment.alignment_status}-${segmentIndex}`}>
+                                      {prefixText && (
+                                        <span className="pinyin-inline-punctuation">{prefixText}</span>
+                                      )}
+                                      <ruby>
+                                        {segment.source_text}
+                                        <rt>{renderPinyinAnnotation(segment)}</rt>
+                                      </ruby>
+                                    </span>
                                   ))}
+                                  {group.displayParts.suffixText && (
+                                    <span className="pinyin-inline-punctuation">{group.displayParts.suffixText}</span>
+                                  )}
                                 </div>
                                 <button
                                   type="button"
@@ -551,14 +664,14 @@ export default function UploadForm() {
                                   aria-label={buttonLabel}
                                   aria-pressed={isPlaying}
                                   disabled={isPlaybackDisabled}
-                                  onClick={() => handleLinePlayback(group, groupIndex)}
+                                  onClick={() => handleLinePlayback(group)}
                                 >
                                   {isPlaybackDisabled ? 'Unavailable' : isPlaying ? 'Stop' : 'Play'}
                                 </button>
                               </div>
-                              {translationSegment && (
+                              {group.translationText && (
                                 <p className="pinyin-line-translation">
-                                  {translationSegment.translation_text}
+                                  {group.translationText}
                                 </p>
                               )}
                             </div>

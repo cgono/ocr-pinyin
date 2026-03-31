@@ -140,6 +140,77 @@ const GROUPED_PLAYBACK_SUCCESS_RESPONSE = {
   }
 }
 
+const DERIVED_READING_SUCCESS_RESPONSE = {
+  status: 'success',
+  request_id: 'req_reading_projection',
+  data: {
+    ocr: {
+      segments: [
+        { text: '老师', language: 'zh', confidence: 0.95, line_id: 0 },
+        { text: '好', language: 'zh', confidence: 0.94, line_id: 0 },
+        { text: '我们开始上课', language: 'zh', confidence: 0.93, line_id: 1 },
+      ]
+    },
+    pinyin: {
+      segments: [
+        {
+          source_text: '老师',
+          pinyin_text: 'lǎo shī',
+          alignment_status: 'aligned',
+          line_id: 0,
+          translation_text: 'teacher'
+        },
+        {
+          source_text: '好',
+          pinyin_text: 'hǎo',
+          alignment_status: 'aligned',
+          line_id: 0,
+          translation_text: 'teacher'
+        },
+        {
+          source_text: '我们开始上课',
+          pinyin_text: 'wǒ men kāi shǐ shàng kè',
+          alignment_status: 'aligned',
+          line_id: 1,
+          translation_text: 'we begin class'
+        },
+      ]
+    },
+    reading: {
+      mode: 'derived',
+      provider: {
+        kind: 'heuristic',
+        name: 'built_in_rules',
+        version: 'v1',
+        applied: true,
+        confidence: 0.78,
+        warnings: []
+      },
+      groups: [
+        {
+          group_id: 'rg_0',
+          line_id: 0,
+          raw_text: '老师好',
+          display_text: '老师，好。',
+          playback_text: '老师，好。',
+          confidence: 0.78,
+          segment_indexes: [0, 1]
+        },
+        {
+          group_id: 'rg_1',
+          line_id: 1,
+          raw_text: '我们开始上课',
+          display_text: '我们开始上课。',
+          playback_text: '我们开始上课。',
+          confidence: 0.76,
+          segment_indexes: [2]
+        },
+      ]
+    },
+    job_id: null
+  }
+}
+
 const NULL_LINE_ID_SUCCESS_RESPONSE = {
   status: 'success',
   request_id: 'req_null_line_id',
@@ -337,6 +408,24 @@ describe('UploadForm', () => {
     expect(within(lineGroups[1]).getByText('同学们好')).toBeInTheDocument()
   })
 
+  it('prefers derived reading groups and shows an auto-punctuation note when reading data is applied', async () => {
+    submitProcessRequest.mockResolvedValueOnce(DERIVED_READING_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    const { container } = renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await screen.findByLabelText(/pinyin-result/i)
+
+    expect(screen.getByText(/auto-punctuation applied/i)).toBeInTheDocument()
+    expect(within(container.querySelectorAll('.pinyin-line-group')[0]).getByText('，')).toBeInTheDocument()
+    expect(within(container.querySelectorAll('.pinyin-line-group')[0]).getByText('。')).toBeInTheDocument()
+  })
+
   it('renders translation once per line group with muted styling', async () => {
     submitProcessRequest.mockResolvedValueOnce({
       ...MULTI_LINE_SUCCESS_RESPONSE,
@@ -458,6 +547,23 @@ describe('UploadForm', () => {
     expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(2)
   })
 
+  it('prefers derived playback_text for line pronunciation controls', async () => {
+    submitProcessRequest.mockResolvedValueOnce(DERIVED_READING_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    const playButton = await screen.findByRole('button', { name: /play pronunciation for 老师，好。/i })
+    await user.click(playButton)
+
+    expect(speechMock.utterances[0].text).toBe('老师，好。')
+  })
+
   it('cancels the previous utterance before starting playback for another line', async () => {
     submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
 
@@ -513,6 +619,27 @@ describe('UploadForm', () => {
 
     expect(screen.getByRole('button', { name: /play pronunciation for 老师叫/i })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('button', { name: /play pronunciation for 同学们好/i })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('prefers derived playback_text for page playback order', async () => {
+    submitProcessRequest.mockResolvedValueOnce(DERIVED_READING_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play page pronunciation playback/i }))
+
+    expect(speechMock.utterances[0].text).toBe('老师，好。')
+
+    speechMock.utterances[0].onend?.()
+    await waitFor(() => {
+      expect(speechMock.utterances[1].text).toBe('我们开始上课。')
+    })
   })
 
   it('queues the next page line after the current onend callback completes', async () => {

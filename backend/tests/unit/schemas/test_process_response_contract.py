@@ -11,6 +11,9 @@ from app.schemas.process import (
     ProcessError,
     ProcessResponse,
     ProcessWarning,
+    ReadingData,
+    ReadingGroup,
+    ReadingProviderInfo,
 )
 
 
@@ -221,3 +224,63 @@ def test_success_envelope_preserves_translation_text() -> None:
     assert response.data is not None
     assert response.data.pinyin is not None
     assert response.data.pinyin.segments[0].translation_text == "hello"
+
+
+def test_success_envelope_accepts_optional_reading_projection() -> None:
+    response = ProcessResponse(
+        status="success",
+        request_id="req-15",
+        data=ProcessData(
+            ocr=OcrData(
+                segments=[
+                    OcrSegment(text="老师", language="zh", confidence=0.88, line_id=0)
+                ]
+            ),
+            pinyin=PinyinData(
+                segments=[
+                    PinyinSegment(
+                        source_text="老师",
+                        pinyin_text="lǎo shī",
+                        alignment_status="aligned",
+                        line_id=0,
+                    )
+                ]
+            ),
+            reading=ReadingData(
+                mode="derived",
+                provider=ReadingProviderInfo(
+                    kind="heuristic",
+                    name="built_in_rules",
+                    version="v1",
+                    applied=True,
+                    confidence=0.78,
+                    warnings=[],
+                ),
+                groups=[
+                    ReadingGroup(
+                        group_id="rg_0",
+                        line_id=0,
+                        raw_text="老师",
+                        display_text="老师。",
+                        playback_text="老师。",
+                        confidence=0.78,
+                        segment_indexes=[0],
+                    )
+                ],
+            ),
+        ),
+        diagnostics=_minimal_diagnostics(),
+    )
+
+    assert response.data is not None
+    assert response.data.reading is not None
+    assert response.data.reading.provider.kind == "heuristic"
+    assert response.data.reading.groups[0].segment_indexes == [0]
+
+
+def test_process_data_excludes_reading_when_none() -> None:
+    data = ProcessData(
+        ocr=OcrData(segments=[OcrSegment(text="你好", language="zh", confidence=0.88)])
+    )
+
+    assert "reading" not in data.model_dump(exclude_none=True)

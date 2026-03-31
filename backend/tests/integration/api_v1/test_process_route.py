@@ -231,6 +231,97 @@ def test_process_route_translation_failure_still_returns_success_with_null_trans
     assert response.data.pinyin.segments[0].translation_text is None
 
 
+def test_process_route_success_adds_reading_projection_without_mutating_raw_payloads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRANSLATION_ENABLED", "false")
+
+    raw_segments = [
+        RawOcrSegment(text="老师", language="zh", confidence=0.98, line_id=0),
+        RawOcrSegment(text="好", language="zh", confidence=0.97, line_id=0),
+        RawOcrSegment(text="我们开始上课", language="zh", confidence=0.96, line_id=1),
+    ]
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(raw_segments),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider([RawPinyinSegment(hanzi="好", pinyin="hǎo")]),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "success"
+    assert response.data is not None
+    assert response.data.ocr is not None
+    assert response.data.pinyin is not None
+    assert [segment.text for segment in response.data.ocr.segments] == [
+        "老师",
+        "好",
+        "我们开始上课",
+    ]
+    assert [segment.source_text for segment in response.data.pinyin.segments] == [
+        "老师",
+        "好",
+        "我们开始上课",
+    ]
+    assert response.data.reading is not None
+    assert response.data.reading.provider.kind == "heuristic"
+    assert response.data.reading.groups[0].segment_indexes == [0, 1]
+    assert response.data.reading.groups[0].display_text == "老师好。"
+    assert response.data.reading.groups[1].segment_indexes == [2]
+    assert response.data.reading.groups[1].display_text == "我们开始上课。"
+
+
+def test_process_route_reading_projection_exception_falls_back_to_success_without_reading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRANSLATION_ENABLED", "false")
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.98, line_id=0)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider([RawPinyinSegment(hanzi="你", pinyin="nǐ")]),
+    ), patch(
+        "app.api.v1.process.build_reading_projection",
+        side_effect=RuntimeError("projection exploded"),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "success"
+    assert response.data is not None
+    assert response.data.reading is None
+
+
+def test_process_route_low_confidence_partial_omits_reading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OCR_PROVIDER", raising=False)
+    monkeypatch.setenv("TRANSLATION_ENABLED", "false")
+
+    with patch(
+        "app.services.ocr_service.get_ocr_provider",
+        return_value=StubOcrProvider(
+            [RawOcrSegment(text="你好", language="zh", confidence=0.3, line_id=0)]
+        ),
+    ), patch(
+        "app.services.pinyin_service.get_pinyin_provider",
+        return_value=StubPinyinProvider([RawPinyinSegment(hanzi="你", pinyin="nǐ")]),
+    ):
+        request = _request_with_body(PNG_1X1_BYTES, "image/png")
+        response = asyncio.run(process_image(request))
+
+    assert response.status == "partial"
+    assert response.data is not None
+    assert response.data.reading is None
+
+
 def test_process_route_ocr_no_text_returns_typed_ocr_error() -> None:
     with patch(
         "app.services.ocr_service.get_ocr_provider",

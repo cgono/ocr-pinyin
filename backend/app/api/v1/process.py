@@ -25,6 +25,7 @@ from app.services.image_validation import (
 )
 from app.services.ocr_service import OcrServiceError, extract_chinese_segments, is_low_confidence
 from app.services.pinyin_service import PinyinServiceError, generate_pinyin
+from app.services.reading_service import build_reading_projection
 from app.services.translation_service import enrich_translations
 
 try:
@@ -147,6 +148,11 @@ async def _build_process_response(
         pinyin_data = await generate_pinyin(segments)
         pinyin_ms = (time.monotonic() - pinyin_start) * 1000
         pinyin_data = await enrich_translations(pinyin_data)
+        try:
+            reading_data = build_reading_projection(pinyin_data)
+        except Exception:
+            logger.exception("reading projection failed; falling back to reading=None")
+            reading_data = None
         trace_steps.append(TraceStep(step="pinyin", status="ok"))
     except PinyinServiceError as error:
         pinyin_ms = (time.monotonic() - pinyin_start) * 1000
@@ -196,6 +202,7 @@ async def _build_process_response(
             data=ProcessData(
                 ocr=OcrData(segments=segments),
                 pinyin=pinyin_data,
+                reading=None,
                 job_id=None,
             ),
             warnings=[
@@ -227,6 +234,7 @@ async def _build_process_response(
         data=ProcessData(
             ocr=OcrData(segments=segments),
             pinyin=pinyin_data,
+            reading=reading_data,
             job_id=None,
         ),
         diagnostics=diagnostics,

@@ -321,6 +321,7 @@ Mitigation: single public processing endpoint, minimal auth, no SDK, strict MVP 
 ### Translation & Pronunciation
 
 - FR42: System can return English translation for extracted Chinese text segments.
+- FR43: System can optionally infer punctuation and sentence/clause boundaries for Chinese reading output when source text lacks punctuation.
 
 ### API Lifecycle & Access Model
 
