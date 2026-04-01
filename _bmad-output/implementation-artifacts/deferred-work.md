@@ -1,5 +1,20 @@
 # Deferred Work
 
+## Deferred from: code review of 4-8-track-google-translate-cost-for-pasted-text-requests (2026-04-01)
+
+- Direct `os.environ.get()` in `estimate_text_processing_cost` bypasses app config layer — pre-existing pattern, `estimate_request_cost` uses the same approach
+- `_GOOGLE_TRANSLATE_USD_PER_MILLION_CHARS` constant and `.env.example` value can drift independently — pre-existing, same situation as `_GCV_USD_PER_IMAGE`
+
+## Deferred from: code review of 6-6-add-direct-pasted-text-study-mode (2026-04-01)
+
+- Private helper imports from `process.py` (`_build_validation_error_response`, `_make_diagnostics` etc.) across modules — refactoring to a shared helpers module requires touching `process.py`, separate concern
+- Budget-warn Sentry outcome tag set to `"success"` before being overridden by `"partial"` response — same pattern exists in image endpoint
+- `pinyin_ms` timer excludes `enrich_translations` and `build_reading_projection` duration — pre-existing diagnostic style from image endpoint
+- `file_size_bytes` counted on pre-normalization `source_text` bytes — minor diagnostic inaccuracy
+- No budget-block integration test for `/v1/process-text` — follows same test gap as image endpoint
+- `textarea` change during pending mutation can desync `inputMode`/`lastSubmittedMode` — submit button is disabled while pending so no functional impact
+- **[Story candidate] Track Google Translate API cost in budget system** — `cost_estimate` for `/v1/process-text` is hardcoded to 0.0 USD/SGD because `budget_service.estimate_request_cost` is OCR-only. Text requests do call Google Translate (billed per character). A follow-on story should add `estimate_text_processing_cost(char_count)` to `budget_service` using Google Translate pricing, wire it into `process_text.py`, and record it via `record_request_cost` so the daily budget tracks all spend (not just OCR).
+
 ## Deferred from: code review of 6-2-add-per-line-pronunciation-playback-controls (2026-03-30)
 
 - `cancelPlaybackIfActiveRef.current` reassigned on every render (stable-ref-callback pattern) — works correctly but any future non-ref closure dependency will silently break cleanup without a linter warning

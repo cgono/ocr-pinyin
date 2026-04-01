@@ -5,7 +5,11 @@ import pytest
 
 from app.schemas.diagnostics import CostEstimate
 from app.services import budget_service
-from app.services.budget_service import DailyCostStore, estimate_request_cost
+from app.services.budget_service import (
+    DailyCostStore,
+    estimate_request_cost,
+    estimate_text_processing_cost,
+)
 
 
 def test_google_vision_provider_returns_full_estimate(
@@ -48,6 +52,57 @@ def test_provider_name_with_surrounding_whitespace_is_normalized(
     result = estimate_request_cost(file_size_bytes=50_000)
 
     assert result.confidence == "full"
+
+
+def test_estimate_text_processing_cost_returns_full_estimate_when_translation_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRANSLATION_ENABLED", "true")
+    monkeypatch.delenv("GOOGLE_TRANSLATE_USD_PER_MILLION_CHARS", raising=False)
+
+    result = estimate_text_processing_cost(char_count=5_000)
+
+    assert result.confidence == "full"
+    assert result.estimated_usd == pytest.approx(0.1)
+    assert result.estimated_sgd == pytest.approx(0.135)
+
+
+def test_estimate_text_processing_cost_uses_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRANSLATION_ENABLED", "true")
+    monkeypatch.setenv("GOOGLE_TRANSLATE_USD_PER_MILLION_CHARS", "10")
+
+    result = estimate_text_processing_cost(char_count=5_000)
+
+    assert result.confidence == "full"
+    assert result.estimated_usd == pytest.approx(0.05)
+    assert result.estimated_sgd == pytest.approx(0.0675)
+
+
+def test_estimate_text_processing_cost_returns_unavailable_when_translation_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRANSLATION_ENABLED", "false")
+
+    result = estimate_text_processing_cost(char_count=5_000)
+
+    assert result.confidence == "unavailable"
+    assert result.estimated_usd is None
+    assert result.estimated_sgd is None
+
+
+def test_estimate_text_processing_cost_returns_unavailable_for_invalid_pricing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TRANSLATION_ENABLED", "true")
+    monkeypatch.setenv("GOOGLE_TRANSLATE_USD_PER_MILLION_CHARS", "nan")
+
+    result = estimate_text_processing_cost(char_count=5_000)
+
+    assert result.confidence == "unavailable"
+    assert result.estimated_usd is None
+    assert result.estimated_sgd is None
 
 
 def _full_estimate() -> CostEstimate:

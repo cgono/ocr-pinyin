@@ -114,3 +114,7 @@ class ProcessResponse(BaseModel):
             if self.diagnostics is not None:
                 raise ValueError("error responses cannot include diagnostics")
         return self
+
+
+class TextProcessRequest(BaseModel):
+    source_text: str = Field(max_length=5000)

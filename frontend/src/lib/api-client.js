@@ -8,18 +8,7 @@ export async function getHealthStatus() {
   }
 }
 
-export async function submitProcessRequest(file) {
-  const headers = {}
-  if (file?.type) {
-    headers['Content-Type'] = file.type
-  }
-
-  const response = await fetch(`${API_BASE}/v1/process`, {
-    method: 'POST',
-    headers,
-    body: file || undefined
-  })
-
+async function parseProcessResponse(response) {
   let payload = null
   try {
     payload = await response.json()
@@ -40,4 +29,31 @@ export async function submitProcessRequest(file) {
   }
 
   return payload
+}
+
+export async function submitProcessRequest(file) {
+  const headers = {}
+  if (file?.type) {
+    headers['Content-Type'] = file.type
+  }
+
+  const response = await fetch(`${API_BASE}/v1/process`, {
+    method: 'POST',
+    headers,
+    body: file || undefined
+  })
+
+  return parseProcessResponse(response)
+}
+
+export async function submitTextProcessRequest(sourceText) {
+  const response = await fetch(`${API_BASE}/v1/process-text`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ source_text: sourceText }),
+  })
+
+  return parseProcessResponse(response)
 }

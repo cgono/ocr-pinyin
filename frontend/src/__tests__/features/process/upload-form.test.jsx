@@ -243,8 +243,83 @@ const NULL_LINE_ID_SUCCESS_RESPONSE = {
   }
 }
 
+const TEXT_MODE_SUCCESS_RESPONSE = {
+  status: 'success',
+  request_id: 'req_text_mode',
+  data: {
+    pinyin: {
+      segments: [
+        {
+          source_text: '老师说 Hello',
+          pinyin_text: 'lǎo shī shuō   H e l l o',
+          alignment_status: 'aligned',
+          line_id: 0,
+          translation_text: 'Teacher says hello'
+        },
+        {
+          source_text: '同学们好',
+          pinyin_text: 'tóng xué men hǎo',
+          alignment_status: 'aligned',
+          line_id: 1,
+          translation_text: 'Hello, students'
+        },
+      ]
+    },
+    reading: {
+      mode: 'derived',
+      provider: {
+        kind: 'heuristic',
+        name: 'built_in_rules',
+        version: 'v2',
+        applied: true,
+        confidence: 0.8,
+        warnings: []
+      },
+      groups: [
+        {
+          group_id: 'text_0',
+          line_id: 0,
+          raw_text: '老师说 Hello',
+          display_text: '老师说 Hello。',
+          playback_text: '老师说 Hello。',
+          confidence: 0.8,
+          segment_indexes: [0]
+        },
+        {
+          group_id: 'text_1',
+          line_id: 1,
+          raw_text: '同学们好',
+          display_text: '同学们好。',
+          playback_text: '同学们好。',
+          confidence: 0.8,
+          segment_indexes: [1]
+        },
+      ]
+    },
+    job_id: null
+  },
+  diagnostics: {
+    upload_context: {
+      content_type: 'text/plain',
+      file_size_bytes: 23
+    },
+    timing: {
+      total_ms: 10,
+      ocr_ms: 0,
+      pinyin_ms: 5
+    },
+    trace: {
+      steps: [
+        { step: 'ocr', status: 'skipped' },
+        { step: 'pinyin', status: 'ok' },
+      ]
+    }
+  }
+}
+
 vi.mock('../../../lib/api-client', () => ({
-  submitProcessRequest: vi.fn(async () => DEFAULT_SUCCESS_RESPONSE)
+  submitProcessRequest: vi.fn(async () => DEFAULT_SUCCESS_RESPONSE),
+  submitTextProcessRequest: vi.fn(async () => TEXT_MODE_SUCCESS_RESPONSE)
 }))
 
 vi.mock('react-image-crop', () => ({
@@ -257,7 +332,7 @@ vi.mock('react-image-crop', () => ({
   },
 }))
 
-import { submitProcessRequest } from '../../../lib/api-client'
+import { submitProcessRequest, submitTextProcessRequest } from '../../../lib/api-client'
 
 function createSpeechSynthesisMock({ voices = [{ name: 'Chinese Voice', lang: 'zh-CN' }] } = {}) {
   const utterances = []
@@ -305,6 +380,8 @@ describe('UploadForm', () => {
   beforeEach(() => {
     submitProcessRequest.mockReset()
     submitProcessRequest.mockImplementation(async () => DEFAULT_SUCCESS_RESPONSE)
+    submitTextProcessRequest.mockReset()
+    submitTextProcessRequest.mockImplementation(async () => TEXT_MODE_SUCCESS_RESPONSE)
     // P5: save originals so they can be restored after each test
     originalGetContext = globalThis.HTMLCanvasElement.prototype.getContext
     originalToBlob = globalThis.HTMLCanvasElement.prototype.toBlob
@@ -341,6 +418,66 @@ describe('UploadForm', () => {
 
     expect(screen.getByRole('button', { name: /take photo/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/upload image/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /paste text/i })).toBeInTheDocument()
+  })
+
+  it('submits pasted text through the text endpoint and reuses the reading surface', async () => {
+    const user = userEvent.setup()
+    const { container } = renderWithClient(<UploadForm />)
+
+    await user.click(screen.getByRole('button', { name: /paste text/i }))
+    await user.type(screen.getByLabelText(/paste chinese text/i), '老师说 Hello\n同学们好')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+
+    expect(submitTextProcessRequest).toHaveBeenCalledWith('老师说 Hello\n同学们好')
+    expect(await screen.findByText(/request id:\s*req_text_mode/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/pinyin-result/i)).toBeInTheDocument()
+    expect(screen.queryByAltText(/uploaded image/i)).not.toBeInTheDocument()
+    expect(container.querySelectorAll('.pinyin-line-group')).toHaveLength(2)
+  })
+
+  it('shows pasted-text validation guidance inline', async () => {
+    submitTextProcessRequest.mockRejectedValueOnce(
+      Object.assign(new Error('empty text'), { code: 'text_empty' })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    await user.click(screen.getByRole('button', { name: /paste text/i }))
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/paste some chinese text/i)
+  })
+
+  it('shows no-chinese guidance inline for text_no_chinese_text error', async () => {
+    submitTextProcessRequest.mockRejectedValueOnce(
+      Object.assign(new Error('no chinese text'), { code: 'text_no_chinese_text' })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    await user.click(screen.getByRole('button', { name: /paste text/i }))
+    await user.type(screen.getByLabelText(/paste chinese text/i), 'Hello world')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no chinese text was detected/i)
+  })
+
+  it('shows too-long guidance inline for text_too_long error', async () => {
+    submitTextProcessRequest.mockRejectedValueOnce(
+      Object.assign(new Error('text too long'), { code: 'text_too_long' })
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+
+    await user.click(screen.getByRole('button', { name: /paste text/i }))
+    await user.type(screen.getByLabelText(/paste chinese text/i), '你好')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/text is too long/i)
   })
 
   it('submits to process endpoint through api client', async () => {
@@ -562,6 +699,282 @@ describe('UploadForm', () => {
     await user.click(playButton)
 
     expect(speechMock.utterances[0].text).toBe('老师，好。')
+  })
+
+  it('cancels the previous utterance before starting playback for another line', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play pronunciation for 老师叫/i }))
+    await user.click(screen.getByRole('button', { name: /play pronunciation for 同学们好/i }))
+
+    expect(speechMock.speechSynthesis.cancel).toHaveBeenCalledTimes(2)
+    expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(2)
+    expect(speechMock.utterances[1].text).toBe('同学们好')
+    expect(screen.getByRole('button', { name: /stop pronunciation for 同学们好/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /play pronunciation for 老师叫/i })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('plays grouped lines sequentially from top to bottom and resets after the final line', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play page pronunciation playback/i }))
+
+    expect(speechMock.speechSynthesis.cancel).toHaveBeenCalledTimes(1)
+    expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(1)
+    expect(speechMock.utterances[0].text).toBe('老师叫')
+    expect(screen.getByRole('button', { name: /stop page pronunciation playback/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /stop pronunciation for 老师叫/i })).toHaveAttribute('aria-pressed', 'true')
+
+    speechMock.utterances[0].onend?.()
+    await waitFor(() => {
+      expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(2)
+    })
+
+    expect(speechMock.utterances[1].text).toBe('同学们好')
+    expect(screen.getByRole('button', { name: /stop pronunciation for 同学们好/i })).toHaveAttribute('aria-pressed', 'true')
+
+    speechMock.utterances[1].onend?.()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /play page pronunciation playback/i })).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    expect(screen.getByRole('button', { name: /play pronunciation for 老师叫/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: /play pronunciation for 同学们好/i })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('prefers derived playback_text for page playback order', async () => {
+    submitProcessRequest.mockResolvedValueOnce(DERIVED_READING_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play page pronunciation playback/i }))
+
+    expect(speechMock.utterances[0].text).toBe('老师，好。')
+
+    speechMock.utterances[0].onend?.()
+    await waitFor(() => {
+      expect(speechMock.utterances[1].text).toBe('我们开始上课。')
+    })
+  })
+
+  it('queues the next page line after the current onend callback completes', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+
+    let isInsideOnEnd = false
+    speechMock.speechSynthesis.speak.mockImplementation((utterance) => {
+      if (isInsideOnEnd) {
+        return
+      }
+
+      const originalOnEnd = utterance.onend
+      utterance.onend = (...args) => {
+        isInsideOnEnd = true
+        try {
+          originalOnEnd?.(...args)
+        } finally {
+          isInsideOnEnd = false
+        }
+      }
+    })
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play page pronunciation playback/i }))
+
+    vi.useFakeTimers()
+    try {
+      expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(1)
+      speechMock.utterances[0].onend?.()
+
+      expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(0)
+      expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(2)
+      expect(speechMock.utterances[1].text).toBe('同学们好')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops page playback immediately and prevents further sequence advancement', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play page pronunciation playback/i }))
+    await user.click(screen.getByRole('button', { name: /stop page pronunciation playback/i }))
+
+    expect(speechMock.speechSynthesis.cancel).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: /play page pronunciation playback/i })).toHaveAttribute('aria-pressed', 'false')
+
+    speechMock.utterances[0].onend?.()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(1)
+  })
+
+  it('switches from page playback to a single line when a line control is pressed', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play page pronunciation playback/i }))
+    await user.click(screen.getByRole('button', { name: /play pronunciation for 同学们好/i }))
+
+    expect(speechMock.speechSynthesis.cancel).toHaveBeenCalledTimes(2)
+    expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(2)
+    expect(speechMock.utterances[1].text).toBe('同学们好')
+    expect(screen.getByRole('button', { name: /play page pronunciation playback/i })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: /stop pronunciation for 同学们好/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('switches from line playback to page playback starting from the first line', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await user.click(await screen.findByRole('button', { name: /play pronunciation for 同学们好/i }))
+    await user.click(screen.getByRole('button', { name: /play page pronunciation playback/i }))
+
+    expect(speechMock.speechSynthesis.cancel).toHaveBeenCalledTimes(2)
+    expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(2)
+    expect(speechMock.utterances[1].text).toBe('老师叫')
+    expect(screen.getByRole('button', { name: /stop page pronunciation playback/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /stop pronunciation for 老师叫/i })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('shows a non-blocking fallback note and disables pronunciation controls when no Chinese voice is available', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+    speechMock = createSpeechSynthesisMock({ voices: [{ name: 'English Voice', lang: 'en-US' }] })
+    globalThis.window.speechSynthesis = speechMock.speechSynthesis
+    globalThis.SpeechSynthesisUtterance = speechMock.MockSpeechSynthesisUtterance
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    const disabledButton = await screen.findByRole('button', { name: /pronunciation unavailable for 老师叫/i })
+    expect(disabledButton).toBeDisabled()
+    expect(screen.getByRole('button', { name: /play page pronunciation playback/i })).toBeDisabled()
+    expect(screen.getByText(/no chinese voice is available/i)).toBeInTheDocument()
+  })
+
+  it('shows a non-blocking fallback note when speech synthesis is unsupported', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+    delete globalThis.window.speechSynthesis
+    delete globalThis.SpeechSynthesisUtterance
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    const disabledButton = await screen.findByRole('button', { name: /pronunciation unavailable for 老师叫/i })
+    expect(disabledButton).toBeDisabled()
+    expect(screen.getByRole('button', { name: /play page pronunciation playback/i })).toBeDisabled()
+    expect(screen.getByText(/not supported in this browser/i)).toBeInTheDocument()
+  })
+
+  it('renders one pronunciation control per grouped line when playback is supported', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    await screen.findByLabelText(/pinyin-result/i)
+
+    expect(screen.getByRole('button', { name: /play pronunciation for 老师叫/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /play pronunciation for 同学们好/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /play page pronunciation playback/i })).toBeInTheDocument()
+  })
+
+  it('speaks grouped source text, stops the active line, and resets after playback ends', async () => {
+    submitProcessRequest.mockResolvedValueOnce(GROUPED_PLAYBACK_SUCCESS_RESPONSE)
+
+    const user = userEvent.setup()
+    renderWithClient(<UploadForm />)
+    const form = screen.getByRole('form', { name: /process-upload-form/i })
+
+    const file = new globalThis.File(['img-bytes'], 'test.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText(/upload image/i), file)
+    await user.click(within(form).getByRole('button', { name: /submit/i }))
+
+    const playButton = await screen.findByRole('button', { name: /play pronunciation for 老师叫/i })
+    await user.click(playButton)
+
+    expect(speechMock.speechSynthesis.cancel).toHaveBeenCalledTimes(1)
+    expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(1)
+    expect(speechMock.utterances[0].text).toBe('老师叫')
+    expect(screen.getByRole('button', { name: /stop pronunciation for 老师叫/i })).toHaveAttribute('aria-pressed', 'true')
+
+    speechMock.utterances[0].onend?.()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /play pronunciation for 老师叫/i })).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    await user.click(screen.getByRole('button', { name: /play pronunciation for 老师叫/i }))
+    await user.click(screen.getByRole('button', { name: /stop pronunciation for 老师叫/i }))
+
+    expect(speechMock.speechSynthesis.cancel).toHaveBeenCalledTimes(3)
+    expect(speechMock.speechSynthesis.speak).toHaveBeenCalledTimes(2)
   })
 
   it('cancels the previous utterance before starting playback for another line', async () => {

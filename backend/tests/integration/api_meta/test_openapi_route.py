@@ -35,6 +35,14 @@ def test_openapi_includes_process_route() -> None:
     assert "post" in paths["/v1/process"]
 
 
+def test_openapi_includes_process_text_route() -> None:
+    response = client.get("/openapi.json")
+    body = response.json()
+    paths = body.get("paths", {})
+    assert "/v1/process-text" in paths
+    assert "post" in paths["/v1/process-text"]
+
+
 def test_openapi_process_route_has_binary_content_types() -> None:
     response = client.get("/openapi.json")
     body = response.json()
@@ -46,6 +54,15 @@ def test_openapi_process_route_has_binary_content_types() -> None:
     assert set(content) == ALLOWED_IMAGE_MIME_TYPES
     for schema_entry in content.values():
         assert schema_entry["schema"] == {"type": "string", "format": "binary"}
+
+
+def test_openapi_process_text_route_has_json_request_body() -> None:
+    response = client.get("/openapi.json")
+    body = response.json()
+    post_op = body["paths"]["/v1/process-text"]["post"]
+    request_body = post_op["requestBody"]
+    assert request_body["required"] is True
+    assert "application/json" in request_body["content"]
 
 
 def test_openapi_cors_get_allowed() -> None:

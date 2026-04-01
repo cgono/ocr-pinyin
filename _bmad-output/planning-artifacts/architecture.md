@@ -20,7 +20,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 ### Requirements Overview
 
 **Functional Requirements:**
-The product requires an end-to-end processing workflow that begins with phone-based image upload and performs quality validation, OCR extraction of Chinese text, language filtering, and Hanyu Pinyin generation. Results must be returned in both API-friendly JSON and phone-friendly HTML views, including original image context and aligned output where possible. The system must support explicit partial-result behavior and retry flows instead of binary success/fail responses.
+The product requires an end-to-end processing workflow that begins with either phone-based image upload or direct pasted-text input and performs quality validation, OCR extraction of Chinese text when needed, language filtering, Hanyu Pinyin generation, and English translation. Results must be returned in both API-friendly JSON and phone-friendly HTML views, including original image context when present and aligned output where possible. The system must support explicit partial-result behavior and retry flows instead of binary success/fail responses.
 
 Operationally, the requirements include service health/metrics endpoints, diagnostics visibility (raw OCR output, confidence indicators, timing, trace data), lightweight usage history retrieval, and a versioned `/v1` API contract. The MVP runs unauthenticated in a personal environment, but must preserve a migration path toward Apple ID authentication and broader content-management capabilities in future phases. Reading quality can also be enhanced by an additive derived-reading projection that infers punctuation and sentence/clause grouping for punctuationless Chinese text without mutating the raw OCR or pinyin records.
 
@@ -30,15 +30,15 @@ Architecture is strongly shaped by correctness-first output quality for reading/
 Cost governance is an explicit non-functional driver: per-request cost estimation, daily aggregation, and budget threshold enforcement/warning around ~1 SGD/day. Observability is also foundational: telemetry emission and diagnostic detail should support rapid self-debug, Sentry-based error tracking, and lightweight metrics dashboarding.
 
 **Scale & Complexity:**
-The project is product-scope small but architecturally non-trivial due to orchestration and cross-cutting concerns. The backend must coordinate upload processing, OCR/pinyin transformation, diagnostics capture, history persistence, and cost/accounting logic while maintaining a simple user-facing flow.
+The project is product-scope small but architecturally non-trivial due to orchestration and cross-cutting concerns. The backend must coordinate upload processing, direct text processing, OCR/pinyin/translation transformation, diagnostics capture, history persistence, and cost/accounting logic while maintaining a simple user-facing flow.
 
 - Primary domain: API backend with companion web interface
 - Complexity level: medium
-- Estimated architectural components: 8-10 core components (API gateway/routing, upload/validation, OCR adapter, pinyin service, orchestration layer, diagnostics/telemetry, cost guardrail, history store/service, rendering/response layer, ops endpoints)
+- Estimated architectural components: 9-11 core components (API gateway/routing, upload/validation, text-input validation, OCR adapter, pinyin/translation services, orchestration layer, diagnostics/telemetry, cost guardrail, history store/service, rendering/response layer, ops endpoints)
 
 ### Technical Constraints & Dependencies
 
-The OCR adapter layer uses a simple functional pipeline — raw provider responses are transformed to normalised RawOcrSegment values through two composed pure functions, keeping provider-specific logic isolated from the service layer. The architecture should remain provider-adaptable for OCR and language processing while preserving deterministic response contracts for `/v1`. The system is intentionally constrained to MVP simplicity: one primary public processing endpoint, no SDK requirement, and no initial authentication.
+The OCR adapter layer uses a simple functional pipeline — raw provider responses are transformed to normalised RawOcrSegment values through two composed pure functions, keeping provider-specific logic isolated from the service layer. The architecture should remain provider-adaptable for OCR and language processing while preserving deterministic response contracts for `/v1`. The system is intentionally constrained to MVP simplicity: two primary public processing endpoints, one for image upload and one for pasted text, no SDK requirement, and no initial authentication.
 
 Performance, correctness, and cost constraints must be enforceable with measurable signals. The implementation should expose health and metrics endpoints sufficient for direct use and future observability integration. Data handling design should preserve future features (audio, translation, book compilation) without forcing major contract redesign.
 
@@ -97,7 +97,7 @@ npm create vite@latest frontend -- --template react
 
 **Code Organization:**
 - Natural split architecture: `backend/` service and `frontend/` app.
-- Clean API boundary for `/v1/process`, `/v1/health`, `/v1/metrics`, history endpoints.
+- Clean API boundary for `/v1/process`, `/v1/process-text`, `/v1/health`, `/v1/metrics`, history endpoints.
 
 **Development Experience:**
 - Quick local iteration (`fastapi dev` + Vite dev server).
@@ -152,7 +152,9 @@ npm create vite@latest frontend -- --template react
 ### API & Communication Patterns
 
 - External API: REST under `/v1`.
-- Primary MVP flow: synchronous `POST /v1/process` returning structured result.
+- Primary MVP flows:
+  - synchronous `POST /v1/process` returning structured result for image upload
+  - synchronous `POST /v1/process-text` returning the same result contract for pasted-text processing
 - Async-ready design choice:
   - include response envelope fields compatible with future job processing (`status`, `request_id`, optional `job_id`)
   - keep domain service layer decoupled from transport so sync and async handlers can share logic later
@@ -163,7 +165,7 @@ npm create vite@latest frontend -- --template react
 
 - React + Vite scaffold.
 - Use TanStack Query for API state (queries/mutations/retries/cache) to support learning and clean data-flow patterns.
-- Keep routing minimal for MVP (upload/result/optional history view shell).
+- Keep routing minimal for MVP (upload, pasted text, result, optional history view shell).
 - Styling: lightweight baseline CSS initially; avoid heavy design system in MVP.
 - Frontend calls backend `/v1` endpoints via typed API client module.
 
@@ -212,7 +214,7 @@ npm create vite@latest frontend -- --template react
 - Future key naming uses `resource_id` pattern (example: `request_id`, `history_id`).
 
 **API Naming Conventions:**
-- REST endpoints use plural nouns where applicable (`/v1/history`), action endpoint remains `/v1/process`.
+- REST endpoints use plural nouns where applicable (`/v1/history`); action endpoints remain `/v1/process` and `/v1/process-text`.
 - Path parameters use `{id}` style in FastAPI route declarations.
 - Query/path/header payload fields use `snake_case` in backend contracts.
 - API version prefix is mandatory: `/v1/...`.
@@ -220,7 +222,7 @@ npm create vite@latest frontend -- --template react
 **Code Naming Conventions:**
 - Python: modules/functions/variables `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE_CASE`.
 - React: component files `PascalCase.jsx` (or `.tsx` if TS adopted later), hooks `useXxx`.
-- Frontend shared API client methods mirror backend endpoint intent (`processImage`, `getHistory`).
+- Frontend shared API client methods mirror backend endpoint intent (`processImage`, `processText`, `getHistory`).
 
 ### Structure Patterns
 
@@ -432,7 +434,7 @@ test-bmad/
 
 **API Boundaries:**
 - Public endpoints only under `/v1`.
-- `process` is the primary MVP action endpoint.
+- `process` and `process-text` are the primary MVP action endpoints.
 - `health` and `metrics` are operational boundaries.
 - `history` exists as contract surface; implementation can be memory-backed initially.
 
@@ -441,7 +443,8 @@ test-bmad/
 - Shared UI goes in `components/common`, feature-specific UI stays inside each feature folder.
 
 **Service Boundaries:**
-- `process_service` orchestrates OCR + pinyin + diagnostics.
+- `process_service` orchestrates OCR + pinyin + translation + diagnostics for image input.
+- `process_text_service` orchestrates pasted-text validation + pinyin + translation while reusing the same downstream response contract and participating in the same budget-accounting pipeline.
 - Provider-specific logic stays in `adapters/*_provider.py`.
 - Budget, diagnostics, and history services remain independent cross-cutting units.
 
@@ -454,10 +457,11 @@ test-bmad/
 
 **Feature Mapping:**
 - Image upload + process flow -> `frontend/src/features/process/*`, `backend/app/api/v1/process.py`, `backend/app/services/process_service.py`.
+- Pasted text + process flow -> `frontend/src/features/process/*`, `backend/app/api/v1/process_text.py`, `backend/app/services/process_text_service.py`.
 - OCR + language filtering -> `backend/app/services/ocr_service.py`, `backend/app/adapters/ocr_provider.py`.
 - Pinyin generation -> `backend/app/services/pinyin_service.py`, `backend/app/adapters/pinyin_provider.py`.
 - Diagnostics + traces -> `backend/app/services/diagnostics_service.py`, `frontend/src/features/process/components/DiagnosticsPanel.jsx`.
-- Budget guardrail -> `backend/app/services/budget_service.py`.
+- Budget guardrail for both `/v1/process` and `/v1/process-text` -> `backend/app/services/budget_service.py`, including OCR/image estimation and text-translation estimation from provider pricing inputs.
 - Health/metrics -> `backend/app/api/v1/health.py`, `backend/app/api/v1/metrics.py`.
 - History API surface -> `backend/app/api/v1/history.py`, `backend/app/services/history_service.py`, `frontend/src/features/history/*`.
 

@@ -24,12 +24,13 @@ completedAt: 2026-03-01T01:11:23Z
 
 ### Project Vision
 
-test-bmad is a phone-first reading assistant that converts photos of Chinese children's storybook pages into accurate, sentence-level pinyin so Clint can read naturally with his daughter. The product is intentionally dual-purpose: it must deliver practical reading support while also serving as a hands-on learning platform for LangChain orchestration, tool usage, and skills integration. The UX direction is "accuracy and clarity first, complexity on demand," so the interface stays focused during reading while preserving transparent diagnostics when needed. Where source text lacks punctuation, the product may use an assistive derived-reading layer to infer punctuation and sentence/clause grouping for the primary reading surface while still preserving access to the raw extracted form.
+test-bmad is a phone-first reading assistant that converts photos of Chinese children's storybook pages or pasted Chinese text into accurate, sentence-level pinyin and English translation so Clint can read naturally with his daughter or study lyrics and stories on his own. The product is intentionally dual-purpose: it must deliver practical reading support while also serving as a hands-on learning platform for LangChain orchestration, tool usage, and skills integration. The UX direction is "accuracy and clarity first, complexity on demand," so the interface stays focused during reading while preserving transparent diagnostics when needed. Where source text lacks punctuation, the product may use an assistive derived-reading layer to infer punctuation and sentence/clause grouping for the primary reading surface while still preserving access to the raw extracted form.
 
 ### Target Users
 
 Primary user: Clint, an intermediate technical solo builder and parent, using iPhone Safari during live reading sessions.
 Primary use context: real-time bedtime or shared reading moments where speed and trust matter, and cognitive load must remain low.
+Secondary active use context: personal study sessions with pasted Chinese lyrics, web stories, and other copied text where OCR would add unnecessary friction.
 Secondary future context: broader family use and saved-book workflows, including a "compile to book" capability not available in current alternatives.
 
 ### Key Design Challenges
@@ -41,7 +42,7 @@ Pleco's OCR experience is not sufficiently accurate for this use case and is opt
 The interface must support focused reading sessions while also enabling technical introspection for LangChain learning without forcing developer complexity into the default user flow.
 
 3. Mobile-first clarity on iPhone Safari:
-The result view must minimize distraction, keep pinyin visually dominant, and ensure toggled metadata/diagnostics remain accessible but non-intrusive.
+The result view must minimize distraction, keep pinyin visually dominant, and ensure toggled metadata/diagnostics remain accessible but non-intrusive across both photo and pasted-text flows.
 
 ### Design Opportunities
 
@@ -52,13 +53,13 @@ Show pinyin-first results by default, hide metadata initially, and provide expli
 Use clear confidence indicators, partial-result messaging, and retry guidance to make uncertainty understandable and actionable instead of opaque.
 
 3. Extensible reading surface:
-Design MVP layout to accommodate future English translation and long-term "compile to book" workflows without reworking core interaction patterns.
+Design MVP layout to accommodate translation-first study, future pronunciation controls, and long-term "compile to book" workflows without reworking core interaction patterns.
 
 ## Core User Experience
 
 ### Defining Experience
 
-The core experience of test-bmad is a repeatable page-reading loop: capture or upload a Chinese storybook page, receive sentence-level pinyin, continue reading, then immediately process the next page. The product succeeds when this loop feels continuous and unobtrusive during live reading with a child. The UX should minimize context switching and keep the user anchored in a single focused flow. For punctuationless pages, sentence-level readability may come from inferred punctuation/grouping in the primary reading view rather than from the source page alone.
+The core experience of test-bmad is a repeatable reading loop with two entry modes: capture/upload a Chinese storybook page or paste Chinese text directly, receive sentence-level pinyin plus translation, and continue reading or studying without leaving the app. The product succeeds when this loop feels continuous and unobtrusive during live reading with a child and equally direct during solo study. The UX should minimize context switching and keep the user anchored in a single focused flow. For punctuationless pages, sentence-level readability may come from inferred punctuation/grouping in the primary reading view rather than from the source page alone.
 
 ### Platform Strategy
 
@@ -71,7 +72,7 @@ Future-ready platform considerations include optional pronunciation support (for
 The following interactions must feel frictionless:
 
 1. Start processing quickly:
-Open from home-screen shortcut and reach image capture/upload with minimal taps.
+Open from home-screen shortcut and reach image capture/upload or pasted-text input with minimal taps.
 
 2. Continuous page progression:
 After receiving pinyin for one page, user can immediately process the next page without navigation overhead.
@@ -124,7 +125,7 @@ The primary emotional goal is calm confidence during bedtime reading. The produc
 1. Entry (open app):
 Desired feeling is calm and prepared. Launch should feel immediate and familiar, not technical.
 
-2. Processing (upload to result):
+2. Processing (capture or paste to result):
 Desired feeling is reassured momentum. The app should communicate progress clearly so waiting never feels uncertain.
 
 3. Result (successful conversion):
@@ -633,8 +634,8 @@ Coverage assessment:
 
 **Purpose:** Primary entry block for camera-first intake.
 **Usage:** First screen and restart states.
-**Anatomy:** Title, short hint text, `Take Photo` primary CTA, `Upload Existing` secondary action.
-**States:** idle, camera-open, upload-in-progress, input-error.
+**Anatomy:** Title, short hint text, `Take Photo` primary CTA, `Upload Existing` secondary action, `Paste Text` tertiary mode switch.
+**States:** idle, camera-open, upload-in-progress, paste-mode, input-error.
 **Variants:** default, compact.
 **Accessibility:** Button labels explicit; focus ring; proper file input labeling for upload path.
 **Content Guidelines:** Keep copy short and task-focused.
@@ -775,8 +776,8 @@ Info feedback:
 ### Form Patterns
 
 Input scope:
-- MVP forms are minimal: capture/upload interaction and optional toggles.
-- Avoid multi-field forms in core reading loop.
+- MVP forms are minimal: capture/upload interaction, a single pasted-text field, and optional toggles.
+- Avoid multi-field forms in core reading loop beyond the dedicated Chinese text textarea.
 
 Validation:
 - Validate file/image quality early.
@@ -798,6 +799,7 @@ Global pattern:
 
 Primary loop navigation:
 - `Take Photo` -> processing -> result -> `Next Page` -> repeat.
+- `Paste Text` -> processing -> result -> edit/paste next text -> repeat.
 
 Secondary navigation:
 - Diagnostics exposed as inline disclosure (`Show Details`) rather than separate page.

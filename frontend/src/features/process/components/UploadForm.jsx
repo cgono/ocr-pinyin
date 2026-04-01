@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { useMutation } from '@tanstack/react-query'
 
-import { submitProcessRequest } from '../../../lib/api-client'
+import { submitProcessRequest, submitTextProcessRequest } from '../../../lib/api-client'
 import CropPreview from './CropPreview'
 import DiagnosticsPanel from './DiagnosticsPanel'
 
@@ -18,6 +18,9 @@ const recoveryGuidanceByCode = {
   pinyin_provider_unavailable: 'Pinyin generation is temporarily unavailable. Tap Submit to retry.',
   pinyin_execution_failed: 'Pinyin generation encountered an error. Tap Submit to retry.',
   ocr_low_confidence: 'OCR confidence is low. Tap Retake Photo for a clearer result.',
+  text_empty: 'Paste some Chinese text to continue.',
+  text_too_long: 'Text is too long. Shorten it and try again.',
+  text_no_chinese_text: 'No Chinese text was detected. Paste Chinese text and try again.',
 }
 
 function statusPanelClass(mutation) {
@@ -231,7 +234,9 @@ function buildSpokenLineText(group) {
 }
 
 export default function UploadForm() {
+  const [inputMode, setInputMode] = useState('image')
   const [file, setFile] = useState(null)
+  const [sourceText, setSourceText] = useState('')
   const [previewUrl, setPreviewUrl] = useState(null)
   const [cropImageUrl, setCropImageUrl] = useState(null)
   const [cameraFile, setCameraFile] = useState(null)
@@ -248,6 +253,7 @@ export default function UploadForm() {
   const queuedPagePlaybackTimeoutRef = useRef(null)
   const ignoreNextSpeechErrorRef = useRef(false)
   const cancelPlaybackIfActiveRef = useRef(() => {})
+  const [lastSubmittedMode, setLastSubmittedMode] = useState('image')
 
   // Create and revoke object URL when file changes
   useEffect(() => {
@@ -263,13 +269,22 @@ export default function UploadForm() {
   }, [file])
 
   const mutation = useMutation({
-    mutationFn: (nextFile = file) => submitProcessRequest(nextFile),
+    mutationFn: (submission) => {
+      if (submission?.mode === 'text') {
+        return submitTextProcessRequest(submission.sourceText)
+      }
+      return submitProcessRequest(submission?.file ?? file)
+    },
   })
 
   const handleFileChange = (event) => {
     const nextFile = event.target.files?.[0] || null
+    setInputMode('image')
+    setLastSubmittedMode('image')
     setFile(nextFile)
+    setSourceText('')
     setDismissedLowConfidence(false)
+    mutation.reset()
   }
 
   const handleCameraCapture = (event) => {
@@ -280,8 +295,10 @@ export default function UploadForm() {
       return
     }
 
+    setInputMode('image')
     setCameraFile(nextFile)
     setCropImageUrl(URL.createObjectURL(nextFile))
+    setSourceText('')
     setDismissedLowConfidence(false)
     mutation.reset()
   }
@@ -294,25 +311,51 @@ export default function UploadForm() {
       : cameraFile
 
     setCropImageUrl(null)
+    setInputMode('image')
     setFile(nextFile)
     setCameraFile(nextFile)
+    setSourceText('')
+    setLastSubmittedMode('image')
     setDismissedLowConfidence(false)
-    mutation.mutate(nextFile)
+    mutation.mutate({ mode: 'image', file: nextFile })
   }
 
   const handleCropDismiss = () => {
     setCropImageUrl(null)
     setCameraFile(null)
+    setInputMode('image')
     setFile(null)
     setPreviewUrl(null)
     setDismissedLowConfidence(false)
     mutation.reset()
   }
 
+  const handlePasteMode = () => {
+    setInputMode('text')
+    setLastSubmittedMode('text')
+    setFile(null)
+    setPreviewUrl(null)
+    setCropImageUrl(null)
+    setCameraFile(null)
+    setDismissedLowConfidence(false)
+    mutation.reset()
+  }
+
+  const handleSourceTextChange = (event) => {
+    setInputMode('text')
+    setSourceText(event.target.value)
+    setDismissedLowConfidence(false)
+  }
+
   const handleSubmit = (event) => {
     event.preventDefault()
     setDismissedLowConfidence(false)
-    mutation.mutate()
+    setLastSubmittedMode(inputMode)
+    if (inputMode === 'text') {
+      mutation.mutate({ mode: 'text', sourceText })
+      return
+    }
+    mutation.mutate({ mode: 'image', file })
   }
 
   const pinyinSegments = mutation.data?.data?.pinyin?.segments || []
@@ -323,6 +366,7 @@ export default function UploadForm() {
   const derivedReadingGroups = resolveDerivedReadingGroups(readingData, pinyinSegments)
   const playbackGroups = derivedReadingGroups ?? normalizeFallbackGroups(lineGroups)
   const hasPlaybackGroups = (playbackGroups?.length ?? 0) > 0
+  const isTextResult = mutation.data && lastSubmittedMode === 'text'
 
   function clearActivePlayback() {
     if (queuedPagePlaybackTimeoutRef.current != null) {
@@ -554,10 +598,30 @@ export default function UploadForm() {
               onChange={handleFileChange}
             />
           </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={handlePasteMode}
+          >
+            Paste Text
+          </button>
           <button type="submit" disabled={mutation.isPending || !!cropImageUrl} className="btn-secondary">
             {mutation.isPending ? 'Submitting...' : 'Submit'}
           </button>
         </div>
+        {inputMode === 'text' && (
+          <div className="file-input-wrapper">
+            <label className="upload-label" htmlFor="source-text">Paste Chinese text</label>
+            <textarea
+              id="source-text"
+              name="source-text"
+              rows="6"
+              maxLength={5000}
+              value={sourceText}
+              onChange={handleSourceTextChange}
+            />
+          </div>
+        )}
       </form>
 
       {cropImageUrl ? (
@@ -578,7 +642,7 @@ export default function UploadForm() {
           {mutation.isPending && (
             <p className="status-panel__message">
               <span className="loading-spinner" aria-hidden="true" />
-              Uploading image...
+              {lastSubmittedMode === 'text' ? 'Processing text...' : 'Uploading image...'}
             </p>
           )}
           {mutation.error && (
@@ -640,7 +704,7 @@ export default function UploadForm() {
 
               {(previewUrl || pinyinSegments.length > 0) && (
                 <div aria-label="result-view" className="result-view">
-                  {previewUrl && (
+                  {!isTextResult && previewUrl && (
                     <div>
                       <img
                         src={previewUrl} // codeql[js/xss-through-dom] - always a blob: URL from URL.createObjectURL
@@ -744,6 +808,11 @@ export default function UploadForm() {
                                   <rt>{renderPinyinAnnotation(seg)}</rt>
                                 </ruby>
                               ))}
+                              {pinyinSegments.find(s => s.translation_text) && (
+                                <p className="pinyin-line-translation">
+                                  {pinyinSegments.find(s => s.translation_text).translation_text}
+                                </p>
+                              )}
                             </div>
                           </div>
                         )}
@@ -753,7 +822,9 @@ export default function UploadForm() {
                 </div>
               )}
 
-              <DiagnosticsPanel diagnostics={mutation.data?.diagnostics} ocrSegments={ocrSegments} />
+              {!isTextResult && (
+                <DiagnosticsPanel diagnostics={mutation.data?.diagnostics} ocrSegments={ocrSegments} />
+              )}
             </div>
           )}
         </div>

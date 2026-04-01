@@ -62,6 +62,7 @@ FR39: System can operate in MVP without user authentication.
 FR40: System can support future migration to Apple ID based authentication.
 FR42: System can return English translation for extracted Chinese text segments.
 FR43: System can optionally infer punctuation and sentence/clause boundaries for Chinese reading output when source text lacks punctuation.
+FR44: User can paste Chinese text directly into the app and generate pinyin plus English translation without running OCR.
 
 ### NonFunctional Requirements
 
@@ -138,6 +139,7 @@ FR39: Epic 1 - MVP no-auth operation
 FR40: Epic 5 - future Apple ID migration path
 FR42: Epic 6 - English translation for extracted Chinese text
 FR43: Epic 6 - optional auto-punctuation and sentence-aware reading groups
+FR44: Epic 6 - direct pasted-text study flow
 
 ## Epic List
 
@@ -167,10 +169,10 @@ Refine the capture-to-result experience based on live MVP testing, and keep the 
 **FRs covered:** FR12, FR14, FR15, FR29, FR30, FR31, FR32
 **Added:** Stories 4.1 and 4.2 (UX polish from live MVP testing — camera capture flow and line layout preservation)
 
-### Epic 6: Translation & Pronunciation Output
-Add English translation for extracted Chinese text, with architecture extensibility for future audio pronunciation output.
+### Epic 6: Translation, Pronunciation & Direct Text Study
+Add English translation for extracted Chinese text, pronunciation support, assistive reading improvements, and a direct pasted-text study flow.
 **Depends on:** Epic 2 (segment alignment), Epic 4 (line_id layout)
-**FRs covered:** FR42, FR43
+**FRs covered:** FR42, FR43, FR44
 **Sprint priority:** Worked before Epic 5 — added via sprint-change-proposal-2026-03-29-translation-release.md
 
 ### Epic 5: History, Reuse & Future Evolution
@@ -774,9 +776,39 @@ So that I never manually bump versions or publish releases, and a malformed rend
 
 **Note:** Added via sprint-change-proposal-2026-03-29-versioning.md
 
-## Epic 6: Translation & Pronunciation Output
+### Story 4.8: Track Google Translate Cost for Pasted-Text Requests
 
-Add English translation for extracted Chinese text, with architecture extensibility for future audio pronunciation output.
+As Clint,
+I want pasted-text translation requests included in request-cost estimation and daily budget accounting,
+So that the budget system reflects actual Google Translate spend instead of treating text study as free.
+
+**Acceptance Criteria:**
+
+**Given** a `POST /v1/process-text` request is accepted for translation processing
+**When** request cost is estimated
+**Then** the system calculates text-processing cost from submitted text size using configured Google Translate pricing rules
+**And** the estimated cost is returned through the same diagnostics/metrics field used by image requests.
+
+**Given** a pasted-text request completes
+**When** cost accounting is recorded
+**Then** the request cost is persisted through the same daily accounting path as image requests
+**And** daily totals include text-translation spend when evaluating budget warnings or enforcement.
+
+**Given** translation is disabled, skipped, or provider-pricing metadata is unavailable
+**When** the text-request estimate is prepared
+**Then** the system uses the same explicit fallback/confidence signaling pattern defined in Story 4.3
+**And** the request still completes without misreporting the cost path as OCR-based.
+
+**Given** backend tests run
+**When** text-processing cost support is added
+**Then** targeted coverage verifies request diagnostics, daily aggregate totals, and budget-threshold behavior for pasted-text requests
+**And** existing image-request cost behavior remains unchanged.
+
+**Note:** Added via sprint-change-proposal-2026-04-01-translate-budget.md
+
+## Epic 6: Translation, Pronunciation & Direct Text Study
+
+Add English translation for extracted Chinese text, pronunciation support, assistive reading improvements, and a direct pasted-text study flow.
 **Depends on:** Epic 2 (segment alignment), Epic 4 (line_id layout)
 
 ### Story 6.1: Add English Translation Below Chinese Characters
@@ -969,6 +1001,82 @@ So that the reading result is easier to follow, wraps more naturally, and spoken
 ```
 
 **Note:** Added via sprint-change-proposal-2026-03-31-auto-punctuation.md
+
+### Story 6.5: Improve Reading Heuristic with Clause-Final Particle Detection
+
+As Clint,
+I want the reading service to detect clause-final particles mid-line and insert commas at those boundaries,
+So that auto-punctuated text reads and plays back more naturally instead of producing one long unpunctuated sentence.
+
+**Acceptance Criteria:**
+
+**Given** a line of Chinese text containing one or more clause-final particles mid-line
+**When** the reading service builds the display and playback text
+**Then** a comma is inserted after each qualifying particle
+**And** terminal punctuation is still appended when needed.
+
+**Given** a particle appears too close to the start of its current clause or at end-of-text
+**When** the reading heuristic evaluates it
+**Then** no comma is inserted
+**And** obviously unnatural punctuation artifacts are avoided.
+
+**Given** the heuristic produces no useful improvement over the v1 output
+**When** `build_reading_projection` is called
+**Then** it falls back to `None` with the same semantics as Story 6.4.
+
+**Given** all existing backend tests run
+**When** the heuristic is upgraded
+**Then** provider metadata versioning and targeted heuristic tests continue to pass.
+
+**Note:** Implemented in `_bmad-output/implementation-artifacts/6-5-improve-reading-heuristic-with-clause-final-particle-detection.md`.
+
+### Story 6.6: Add Direct Pasted-Text Study Mode
+
+As Clint,
+I want to paste Chinese text directly into the app and generate pinyin plus English translation,
+So that I can study song lyrics, online stories, and other copied passages without taking a photo first.
+
+**Acceptance Criteria:**
+
+**Given** I switch the app to a pasted-text mode
+**When** I paste Chinese text and submit it
+**Then** the app skips OCR
+**And** it returns the same reading-friendly result shape with pinyin, translation, and optional reading projection.
+
+**Given** the submitted text contains mixed Chinese and non-Chinese content
+**When** processing runs
+**Then** the system preserves the source text needed for the reading view
+**And** Chinese text remains the basis for pinyin generation and translation.
+
+**Given** the pasted-text request succeeds
+**When** the result is rendered
+**Then** the frontend uses the same primary reading surface as image results
+**And** image-specific UI and diagnostics are hidden or omitted gracefully.
+
+**Given** the pasted-text input is empty, too long, or lacks usable Chinese text
+**When** submission is attempted
+**Then** the API returns a structured validation or recoverable error
+**And** the UI gives clear inline guidance to edit the text and retry.
+
+**Given** the backend and frontend test suites run
+**When** the pasted-text feature is added
+**Then** existing image-upload behavior remains unchanged
+**And** new tests cover the direct text endpoint, validation states, and shared result rendering.
+
+**API direction:**
+```
+POST /v1/process-text
+Content-Type: application/json
+
+{
+  "source_text": "老师叫同学们好"
+}
+```
+
+The response reuses the existing `ProcessResponse` envelope and `data.pinyin` / `data.reading` contracts.
+`data.ocr` may be omitted or replaced with a lightweight source-text representation for this endpoint, but clients must not need a separate result renderer.
+
+**Note:** Added via sprint-change-proposal-2026-03-31-text-input-study-mode.md
 
 ---
 

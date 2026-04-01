@@ -6,6 +6,7 @@ from typing import Literal
 from app.schemas.diagnostics import CostEstimate
 
 _GCV_USD_PER_IMAGE = 0.0015
+_GOOGLE_TRANSLATE_USD_PER_MILLION_CHARS = 20.0
 _USD_TO_SGD = 1.35
 _BUDGET_WARN_FRACTION = 0.8
 
@@ -27,6 +28,32 @@ def estimate_request_cost(*, file_size_bytes: int) -> CostEstimate:  # noqa: ARG
         )
 
     return CostEstimate(confidence="unavailable")
+
+
+def estimate_text_processing_cost(*, char_count: int) -> CostEstimate:
+    """Estimate Google Translate spend for an accepted pasted-text request."""
+    if os.environ.get("TRANSLATION_ENABLED", "false").strip().lower() != "true":
+        return CostEstimate(confidence="unavailable")
+
+    raw_price = os.environ.get(
+        "GOOGLE_TRANSLATE_USD_PER_MILLION_CHARS",
+        str(_GOOGLE_TRANSLATE_USD_PER_MILLION_CHARS),
+    )
+    try:
+        usd_per_million_chars = float(raw_price)
+    except ValueError:
+        return CostEstimate(confidence="unavailable")
+
+    if not math.isfinite(usd_per_million_chars) or usd_per_million_chars <= 0 or char_count <= 0:
+        return CostEstimate(confidence="unavailable")
+
+    estimated_usd = round((char_count / 1_000_000) * usd_per_million_chars, 8)
+    estimated_sgd = round(estimated_usd * _USD_TO_SGD, 6)
+    return CostEstimate(
+        estimated_usd=estimated_usd,
+        estimated_sgd=estimated_sgd,
+        confidence="full",
+    )
 
 
 class DailyCostStore:

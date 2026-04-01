@@ -40,7 +40,7 @@ The core problem is not only text conversion. The deeper need is building credib
 
 ### What Makes This Special
 
-The differentiator is end-to-end integration in one app: capture photo, process, and receive pinyin output without manual copy-paste across OCR and chat tools. This reduces friction and supports frequent use on mobile.
+The differentiator is end-to-end integration in one app: capture a photo or paste Chinese text, process it, and receive pinyin plus translation without bouncing between OCR and chat tools. This reduces friction and supports frequent use on mobile for both live reading and text-study sessions.
 
 A second differentiator is pedagogical transparency for the builder: the architecture is designed so the workflow itself teaches LangChain implementation patterns (tool invocation boundaries, orchestration flow, and extensibility for future capabilities such as pronunciation audio generation). The product is intentionally scoped as a weekend project to maximize learning velocity while still delivering a useful daily workflow.
 
@@ -77,7 +77,7 @@ For this personal project, success is measured by capability transfer:
 
 - Accuracy: pinyin output is correct for the vast majority of recognized characters on typical input pages.
 - Speed: median end-to-end processing time < 2 seconds on target runtime.
-- Usability: one-step capture/upload to pinyin result, without manual copy-paste across apps.
+- Usability: one-step capture/upload or direct text paste to pinyin and translation result, without manual copy-paste across multiple apps.
 - Learning objective: you can walk through the implemented LangChain pipeline and justify major design decisions.
 
 ## Product Scope
@@ -88,12 +88,13 @@ For this personal project, success is measured by capability transfer:
 - Web UI accessible from phone for image upload.
 - Image parsing/OCR to extract Chinese characters.
 - Pinyin generation from extracted characters.
+- English translation for extracted Chinese text.
 - Basic response presentation in UI.
 
 ### Growth Features (Post-MVP)
 
 - Audio pronunciation generation for pinyin output.
-- English translation for extracted text — **planned (Epic 6, Story 6.1)**.
+- Direct pasted-text study mode for longer reading passages and lyrics.
 - Quality enhancements for harder images/pages (lighting, skew, layout variation).
 
 ### Vision (Future)
@@ -112,25 +113,31 @@ Clint is reading a Chinese story book with his daughter and hits an unfamiliar c
 
 The key value moment is continuity: no switching apps, no copy-paste, and no interrupted story flow. Accuracy is the primary expectation; speed supports the experience once accuracy is acceptable.
 
-### Journey 2: Primary User Edge Case (Recognition and Mixed Content Errors)
+### Journey 2: Primary User Success Path (Pasted Text Study Flow)
+
+Clint finds Chinese song lyrics or a story online and wants to study it without taking a screenshot or photo. He opens the same app, pastes the Chinese text into a dedicated input area, and submits it directly. The system skips OCR, generates Hanyu Pinyin, adds English translation, and presents the result in the same reading-friendly layout used for page captures.
+
+The key value moment is fast comprehension: no detour through another translator, no OCR artifacts from screenshots, and no need to retype or manually segment the text before studying it out loud.
+
+### Journey 3: Primary User Edge Case (Recognition and Mixed Content Errors)
 
 Clint uploads a page containing mixed Chinese/English text and stylized typography. OCR extraction returns uncertain segments. The system highlights low-confidence output, ignores English text by default, and provides a clear fallback: ask for retake or proceed with marked uncertainty. If OCR appears wrong, the system displays diagnostics (raw extracted text, confidence/timing/tool trace) in a collapsible section above results so Clint can quickly understand whether the issue is image quality, OCR extraction, or conversion logic.
 
 A second edge case appears when the source page already includes Chinese characters plus pinyin. The system still supports pronunciation assistance by preserving both forms and allowing downstream pronunciation support (future audio feature).
 
-### Journey 3: Admin/Operations Journey (Cost and Usage Control)
+### Journey 4: Admin/Operations Journey (Cost and Usage Control)
 
-In admin mode (same user, different role), Clint reviews a lightweight ops panel to understand usage, latency, and cost. He monitors per-request timings, error rates, and cost estimates for OCR/LLM/tool calls. The immediate objective is to keep the weekend prototype affordable while learning observability patterns using Sentry for error and performance monitoring. Later, this same path expands to saved book management and deployment health checks.
+In admin mode (same user, different role), Clint reviews a lightweight ops panel to understand usage, latency, and cost. He monitors per-request timings, error rates, and cost estimates for OCR, translation, and other tool/provider calls. The immediate objective is to keep the weekend prototype affordable while learning observability patterns using Sentry for error and performance monitoring. Later, this same path expands to saved book management and deployment health checks.
 
 Success in this journey is operational confidence: the app is cheap enough to run, issues are observable, and system behavior is measurable.
 
-### Journey 4: Support/Troubleshooting Journey (Self-Debug Loop)
+### Journey 5: Support/Troubleshooting Journey (Self-Debug Loop)
 
 When output quality is questionable, Clint opens diagnostics on the same page and inspects step-level details: upload metadata, OCR text output, confidence indicators, LangChain/tool execution trace, and total processing time. He can quickly decide whether to retry with a better image, adjust extraction handling, or tune prompt/tool logic. This short feedback loop supports reliability and learning goals.
 
 Success here means fast root-cause identification without leaving the main reading interface.
 
-### Journey 5: API/Integration Journey (Near-Term Developer Path)
+### Journey 6: API/Integration Journey (Near-Term Developer Path)
 
 For tonight's target, Clint uses a simple upload mechanism via web UI. In the near term, the same backend exposes a basic upload endpoint to support automation or alternate clients (shortcut, script, or future app surface). The developer experience priority is minimal integration friction: one endpoint, clear request/response shape, and stable pinyin output contract.
 
@@ -139,7 +146,7 @@ This journey ensures MVP can evolve into reusable LangChain-backed services with
 ### Journey Requirements Summary
 
 These journeys imply capability requirements in five areas:
-- Core processing: photo upload, quality validation, OCR, Chinese-text filtering, pinyin generation, result rendering.
+- Core processing: photo upload, pasted-text input, quality validation, OCR when needed, Chinese-text filtering, pinyin generation, translation, and result rendering.
 - Error handling: confidence-aware output, mixed-language filtering, explicit fallback paths for wrong OCR and low-quality images.
 - Observability: request timing, error tracking, cost/usage instrumentation, and Sentry integration.
 - Diagnostics UX: collapsible same-page debug block with raw OCR + trace + timings for self-support.
@@ -322,6 +329,7 @@ Mitigation: single public processing endpoint, minimal auth, no SDK, strict MVP 
 
 - FR42: System can return English translation for extracted Chinese text segments.
 - FR43: System can optionally infer punctuation and sentence/clause boundaries for Chinese reading output when source text lacks punctuation.
+- FR44: User can paste Chinese text directly into the app and generate pinyin plus English translation without running OCR.
 
 ### API Lifecycle & Access Model
 

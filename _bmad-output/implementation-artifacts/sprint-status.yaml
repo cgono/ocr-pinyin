@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: "2026-03-24"
-last_updated: "2026-03-31"  # updated: story 4-0 done; epics 1, 2, 3 closed; epic-4 restructured via sprint-change-proposal-2026-03-28; story 4-1 done; story 4-2 done; story 4-3 done; story 4-4 done; story 4-5 done; story 4-6 done; staging environment added via sprint-change-proposal-2026-03-29 (render.yaml, ci.yml, docs/deployment.md); story 4-7 added via sprint-change-proposal-2026-03-29-versioning; story 4-7 done; epic-4 retrospective done; epic-6 added + prioritized before epic-5 via sprint-change-proposal-2026-03-29-translation-release; release strategy formalized (feature→staging→main); story 6-1 created and marked ready-for-dev; story 6-2 inferred from Epic 6 audio scope and created; story 6-2 implemented and moved to review; story 6-2 code review done - 3 patches applied, 5 deferred; story 6-3 inferred from remaining Epic 6 audio scope and created; story 6-3 code review done - 3 patches applied, 5 deferred; sprint-change-proposal-2026-03-31-auto-punctuation approved; story 6-4 created and marked ready-for-dev; story 6-4 moved to in-progress; story 6-4 implemented, validated, and moved to review; epic-6 reopened for assistive reading projection work; story 6-4 code review done - 3 patches applied (unguarded exception fallback + 2 missing tests), 2 decisions resolved, 7 deferred; story 6-4 done; story 6-5 created (particle-based clause detection v2 heuristic) and marked ready-for-dev; story 6-5 moved to in-progress; story 6-5 implemented, validated, and moved to review; story 6-5 code review done - 2 patches applied (off-by-one in clause-length guard + missing false-positive test), 3 deferred; story 6-5 done
+last_updated: "2026-04-01"  # updated: story 4-8 done after code review (2 patches applied — enrichment-failure cost fix + missing test; 2 deferred); story 6-6 done after code review (11 patches applied, 1 dismissed as false positive, 7 deferred); epics 1, 2, 3 closed; epic-4 restructured via sprint-change-proposal-2026-03-28; story 4-1 done; story 4-2 done; story 4-3 done; story 4-4 done; story 4-5 done; story 4-6 done; staging environment added via sprint-change-proposal-2026-03-29 (render.yaml, ci.yml, docs/deployment.md); story 4-7 added via sprint-change-proposal-2026-03-29-versioning; story 4-7 done; epic-4 retrospective done; sprint-change-proposal-2026-04-01-translate-budget approved; epic-4 reopened for pasted-text translation budget tracking; story 4-8 added as backlog; epic-6 added + prioritized before epic-5 via sprint-change-proposal-2026-03-29-translation-release; release strategy formalized (feature→staging→main); story 6-1 created and marked ready-for-dev; story 6-2 inferred from Epic 6 audio scope and created; story 6-2 implemented and moved to review; story 6-2 code review done - 3 patches applied, 5 deferred; story 6-3 inferred from remaining Epic 6 audio scope and created; story 6-3 code review done - 3 patches applied, 5 deferred; sprint-change-proposal-2026-03-31-auto-punctuation approved; story 6-4 created and marked ready-for-dev; story 6-4 moved to in-progress; story 6-4 implemented, validated, and moved to review; epic-6 reopened for assistive reading projection work; story 6-4 code review done - 3 patches applied (unguarded exception fallback + 2 missing tests), 2 decisions resolved, 7 deferred; story 6-4 done; story 6-5 created (particle-based clause detection v2 heuristic) and marked ready-for-dev; story 6-5 moved to in-progress; story 6-5 implemented, validated, and moved to review; story 6-5 code review done - 2 patches applied (off-by-one in clause-length guard + missing false-positive test), 3 deferred; story 6-5 done; sprint-change-proposal-2026-03-31-text-input-study-mode approved; epic-6 reopened for pasted-text study flow; story 6-6 implementation artifact created, implemented, validated, and moved to review ahead of epic-5 history work
 project: "test-bmad"
 project_key: "NOKEY"
 tracking_system: "file-system"
@@ -68,7 +68,7 @@ development_status:
   3-6-strengthen-ci-build-and-lock-file-checks: done  # no story file — implemented inline via sprint-change-proposal-2026-03-27.md; changes live in ci.yml
   epic-3-retrospective: done
 
-  epic-4: done
+  epic-4: in-progress
   4-0-document-sprint-change-proposal-process: done
   4-1-camera-capture-flow-preview-crop-submit-spinner-startup-ping: done
   4-2-preserve-text-line-layout-in-ocr-and-pinyin-results: done
@@ -77,15 +77,17 @@ development_status:
   4-5-enforce-or-warn-on-daily-budget-threshold: done  # renumbered from 4-3
   4-6-restrict-oversized-or-high-cost-inputs: done  # renumbered from 4-4
   4-7-release-please-versioning-and-render-yaml-ci-validation: done  # added via sprint-change-proposal-2026-03-29-versioning
+  4-8-track-google-translate-cost-for-pasted-text-requests: done  # added via sprint-change-proposal-2026-04-01-translate-budget
   epic-4-retrospective: done
 
   # Epic 6 is worked before Epic 5 — see sprint-change-proposal-2026-03-29-translation-release.md
-  epic-6: done
+  epic-6: in-progress
   6-1-add-english-translation-below-chinese-characters: done
   6-2-add-per-line-pronunciation-playback-controls: done
   6-3-add-full-page-sequential-pronunciation-playback: done
   6-4-add-optional-auto-punctuation-and-sentence-aware-reading-groups: done
   6-5-improve-reading-heuristic-with-clause-final-particle-detection: done
+  6-6-add-direct-pasted-text-study-mode: done
   epic-6-retrospective: done
 
   epic-5: backlog
