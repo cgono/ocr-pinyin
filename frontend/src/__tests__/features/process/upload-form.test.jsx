@@ -361,33 +361,6 @@ function createSpeechSynthesisMock({ voices = [{ name: 'Chinese Voice', lang: 'z
   }
 }
 
-function createSpeechSynthesisMock({ voices = [{ name: 'Chinese Voice', lang: 'zh-CN' }] } = {}) {
-  const utterances = []
-
-  function MockSpeechSynthesisUtterance(text) {
-    this.text = text
-    this.voice = null
-    this.lang = ''
-    this.onend = null
-    this.onerror = null
-    utterances.push(this)
-  }
-
-  const speechSynthesis = {
-    cancel: vi.fn(),
-    speak: vi.fn(),
-    getVoices: vi.fn(() => voices),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  }
-
-  return {
-    speechSynthesis,
-    MockSpeechSynthesisUtterance,
-    utterances,
-  }
-}
-
 function renderWithClient(ui) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
