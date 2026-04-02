@@ -68,7 +68,7 @@ development_status:
   3-6-strengthen-ci-build-and-lock-file-checks: done  # no story file — implemented inline via sprint-change-proposal-2026-03-27.md; changes live in ci.yml
   epic-3-retrospective: done
 
-  epic-4: in-progress
+  epic-4: done
   4-0-document-sprint-change-proposal-process: done
   4-1-camera-capture-flow-preview-crop-submit-spinner-startup-ping: done
   4-2-preserve-text-line-layout-in-ocr-and-pinyin-results: done
